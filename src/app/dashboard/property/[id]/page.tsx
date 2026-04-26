@@ -57,6 +57,7 @@ export default function PropertyDetailPage({
   const { id } = params
   const property = getPropertyById(id)
   const [copied, setCopied] = useState(false)
+  const [activeImage, setActiveImage] = useState(0)
 
   if (!property) {
     return (

@@ -27,7 +27,13 @@ export default function AdminUsersPage() {
     setError(null)
     try {
       const v = await be.get<KycResp>('/admin/kyc/pending')
-      setItems(Array.isArray(v) ? v : v.items || v.data || [])
+      const list = Array.isArray(v)
+        ? v
+        : (v as { users?: KycUser[]; items?: KycUser[]; data?: KycUser[] }).users ||
+          (v as { items?: KycUser[] }).items ||
+          (v as { data?: KycUser[] }).data ||
+          []
+      setItems(list)
     } catch (e) {
       setError((e as Error).message)
     }

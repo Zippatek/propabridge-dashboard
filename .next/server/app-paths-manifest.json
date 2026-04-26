@@ -1,3 +1,7 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/admin-auth/login/route": "app/api/admin-auth/login/route.js",
+  "/api/admin/be/[...path]/route": "app/api/admin/be/[...path]/route.js",
+  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js"
 }

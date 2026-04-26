@@ -65,8 +65,10 @@ export function adkFetch<T = unknown>(path: string, init: RequestInit = {}) {
 }
 
 export function beFetch<T = unknown>(path: string, init: RequestInit = {}) {
+  // The backend api-gateway/src/routes/admin.js checks the 'x-admin-token' header.
+  // PROPA_BACKEND_ADMIN_TOKEN is set in .env.local to the value the backend expects.
   const token = process.env.PROPA_BACKEND_ADMIN_TOKEN
-  const auth: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {}
+  const auth: Record<string, string> = token ? { 'x-admin-token': token } : {}
   return rawFetch<T>(BE_BASE, path, init, auth, 'propabridge-backend')
 }
 
