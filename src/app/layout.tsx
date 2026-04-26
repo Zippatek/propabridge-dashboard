@@ -43,22 +43,22 @@ const interDisplay = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'MiddlePark — Verified Real Estate in Nigeria',
+  title: 'Propabridg',
   description:
-    'Find verified homes across Nigeria with zero inspection fees. Every listing on MiddlePark is physically inspected and title-verified.',
+    'Find verified homes across Nigeria with zero inspection fees. Every listing on Propabridge is physically inspected and title-verified.',
   keywords: [
     'Nigerian real estate',
     'verified properties',
     'Abuja properties',
     'Kaduna real estate',
     'zero inspection fees',
-    'MiddlePark',
+    'Propabridge',
   ],
   openGraph: {
-    title: 'MiddlePark — Verified Real Estate in Nigeria',
+    title: 'Propabridge',
     description:
       'Find verified homes across Nigeria with zero inspection fees.',
-    siteName: 'MiddlePark',
+    siteName: 'Propabridge',
     type: 'website',
   },
 }

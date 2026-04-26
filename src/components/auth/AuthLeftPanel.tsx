@@ -33,8 +33,8 @@ export function AuthLeftPanel({ variant }: AuthLeftPanelProps) {
       <div className="relative z-10 flex flex-col justify-between p-12 w-full">
         {/* Logo */}
         <div className="text-h4">
-          <span className="font-bold text-white">MIDDLE</span>
-          <span className="font-bold text-action">PARK</span>
+          <span className="font-bold text-white">PROPA</span>
+          <span className="font-bold text-action">BRIDGE</span>
         </div>
 
         {/* Main messaging */}
@@ -45,7 +45,7 @@ export function AuthLeftPanel({ variant }: AuthLeftPanelProps) {
                 Find a verified home without the fear.
               </h1>
               <p className="mt-4 text-[16px] text-white leading-relaxed font-medium">
-                Join thousands of Nigerians who found their homes on MiddlePark — zero fees, zero fake listings.
+                Join thousands of Nigerians who found their homes on Propabridge — zero fees, zero fake listings.
               </p>
             </>
           ) : (

@@ -1,20 +1,25 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { signIn } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { signupSchema, type SignupFormData } from '@/lib/validations'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
-/**
- * SignupForm — Right panel form for the signup page
- * FOUNDATION.md Section 6.2
- */
+const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_BACKEND_BASE ||
+  'https://propabridge-api-gateway-480235407496.us-central1.run.app'
+
 export function SignupForm() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const {
     register,
@@ -26,9 +31,61 @@ export function SignupForm() {
 
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true)
-    // TODO: Integrate with NextAuth / API
-    console.log('Signup data:', data)
-    setTimeout(() => setIsLoading(false), 2000)
+    setServerError(null)
+
+    try {
+      // 1. Register via the live backend
+      const res = await fetch(`${BACKEND_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: `${data.firstName} ${data.lastName}`.trim(),
+          email: data.email,
+          password: data.password,
+          phone: data.phone || undefined,
+        }),
+      })
+
+      const body = await res.json()
+
+      if (!res.ok) {
+        setServerError(body?.error || 'Registration failed. Please try again.')
+        setIsLoading(false)
+        return
+      }
+
+      // 2. Auto sign-in after successful registration
+      const signInResult = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      })
+
+      setIsLoading(false)
+
+      if (signInResult?.error) {
+        // Account created but auto-login failed — send them to login
+        setSuccess(true)
+        setTimeout(() => router.push('/login'), 2000)
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setServerError('Network error. Please check your connection and try again.')
+      setIsLoading(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="w-full max-w-[440px] mx-auto text-center">
+        <CheckCircle2 size={48} className="text-verified mx-auto mb-4" strokeWidth={1.5} />
+        <h2 className="text-h3 text-navy">Account created!</h2>
+        <p className="text-body text-subtle mt-2">Redirecting you to sign in…</p>
+      </div>
+    )
   }
 
   return (
@@ -38,9 +95,14 @@ export function SignupForm() {
         Get started with Propabridge — zero fees, zero fake listings
       </p>
 
-      {/* Form */}
+      {serverError && (
+        <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-button bg-danger-light border border-danger/20 text-danger text-body-sm">
+          <AlertCircle size={16} strokeWidth={1.8} />
+          {serverError}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
-        {/* Name row */}
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="First name"
@@ -91,7 +153,6 @@ export function SignupForm() {
           {...register('confirmPassword')}
         />
 
-        {/* Terms checkbox */}
         <label className="flex items-start gap-3 cursor-pointer group">
           <input
             type="checkbox"
@@ -113,23 +174,14 @@ export function SignupForm() {
           <p className="text-caption text-danger -mt-3">{errors.terms.message}</p>
         )}
 
-        <Button
-          type="submit"
-          variant="primary"
-          isLoading={isLoading}
-          className="w-full"
-        >
+        <Button type="submit" variant="primary" isLoading={isLoading} className="w-full">
           CREATE ACCOUNT <ChevronRight size={14} />
         </Button>
       </form>
 
-      {/* Sign in link */}
       <p className="mt-8 text-center text-body text-subtle">
         Already have an account?{' '}
-        <Link
-          href="/login"
-          className="font-semibold text-navy hover:text-action transition-colors duration-150"
-        >
+        <Link href="/login" className="font-semibold text-navy hover:text-action transition-colors duration-150">
           Sign in →
         </Link>
       </p>

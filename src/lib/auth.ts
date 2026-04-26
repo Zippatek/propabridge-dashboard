@@ -4,15 +4,17 @@ import Google from 'next-auth/providers/google'
 
 /**
  * PROPABRIDGE AUTH CONFIGURATION
- * NextAuth.js v5 — FOUNDATION.md Section 10
+ * NextAuth.js v5 — real user auth via propabridge-backend API gateway
  *
  * Providers:
- * - Google OAuth (requires GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET env vars)
- * - Credentials (email + password)
+ * - Google OAuth
+ * - Credentials → POST /auth/login on the live backend (property-db-instance)
  *
- * For development, credentials auth uses mock validation.
- * Replace with real API/database validation in production.
+ * Registration is handled client-side via POST /auth/register on the backend.
  */
+
+const BACKEND_BASE =
+  process.env.PROPA_BACKEND_BASE || 'https://propabridge-api-gateway-480235407496.us-central1.run.app'
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -27,19 +29,41 @@ export const authConfig: NextAuthConfig = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Development mock — replace with real auth in production
-        if (
-          credentials?.email === 'aminu@example.com' &&
-          credentials?.password === 'password123'
-        ) {
-          return {
-            id: 'user-001',
-            name: 'Aminu Ibrahim',
-            email: 'aminu@example.com',
-            image: '/images/avatar-default.jpg',
+        if (!credentials?.email || !credentials?.password) return null
+
+        try {
+          const res = await fetch(`${BACKEND_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+            // Short timeout — if backend is unreachable, fail fast
+            signal: AbortSignal.timeout(10_000),
+          })
+
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}))
+            // Return null to trigger "CredentialsSignin" error in NextAuth
+            console.warn('[Auth] Login rejected:', body?.error)
+            return null
           }
+
+          const { user } = await res.json()
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: null,
+            // Custom fields forwarded through JWT
+            role: user.role,
+            kyc_status: user.kyc_status,
+          }
+        } catch (err) {
+          console.error('[Auth] Backend unreachable:', (err as Error).message)
+          return null
         }
-        return null
       },
     }),
   ],
@@ -54,12 +78,16 @@ export const authConfig: NextAuthConfig = {
     jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.role = (user as { role?: string }).role ?? 'buyer'
+        token.kyc_status = (user as { kyc_status?: string }).kyc_status ?? 'pending'
       }
       return token
     },
     session({ session, token }) {
-      if (session.user && token.id) {
+      if (session.user) {
         session.user.id = token.id as string
+        ;(session.user as { role?: string; kyc_status?: string }).role = token.role as string
+        ;(session.user as { kyc_status?: string }).kyc_status = token.kyc_status as string
       }
       return session
     },

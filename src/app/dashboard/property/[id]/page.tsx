@@ -45,7 +45,7 @@ const amenityIcons: Record<string, React.ElementType> = {
 
 /**
  * Property Details Page 
- * Adapted to exactly match the MiddlePark branding layout 
+ * Adapted to exactly match the Propabridge branding layout 
  * (Full width edge-to-edge hero, separated title underneath,
  * Spec grid grouped into top/bottom without lines, custom layout grids).
  */
@@ -324,7 +324,7 @@ export default function PropertyDetailPage({
                 </div>
                 <div>
                   <p className="text-[11px] text-[#4a5568] uppercase tracking-[0.1em] font-semibold mb-1">Listed By</p>
-                  <p className="text-[18px] font-bold text-[#001a40]">MiddlePark Team</p>
+                  <p className="text-[18px] font-bold text-[#001a40]">Propabridge Team</p>
                 </div>
               </div>
 
@@ -332,8 +332,8 @@ export default function PropertyDetailPage({
                 <div className="flex items-center justify-between pb-4 border-b border-dashed border-[#001a40]/10">
                   <div>
                     <p className="text-[14px] font-bold text-[#001a40] mb-0.5">Email</p>
-                    <a href="mailto:hello@middlepark.com" className="text-[14px] text-[#4a5568] hover:text-[#006aff] underline underline-offset-4 decoration-current/30">
-                      hello@middlepark.com
+                    <a href="mailto:hello@propabridge.com" className="text-[14px] text-[#4a5568] hover:text-[#006aff] underline underline-offset-4 decoration-current/30">
+                      hello@propabridge.com
                     </a>
                   </div>
                   <Mail size={22} strokeWidth={1.5} className="text-[#001a40]" />

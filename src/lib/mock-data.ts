@@ -1,5 +1,5 @@
 /**
- * MIDDLEPARK MOCK DATA
+ * PROPABRIDGE MOCK DATA
  * For development and preview purposes
  * FOUNDATION.md Section 12
  */
@@ -72,7 +72,7 @@ export const mockProperties: Property[] = [
       'Swimming Pool', 'Rooftop Garden', 'BQ', 'Generator', 'Borehole',
       'Ample Parking', 'Private Garden',
     ],
-    description: '400 sqm. Fully detached. 4 bedrooms. 5 bathrooms. Green spaces. Recreational facilities. The Promenade Mall a short walk away. This is not the average duplex — it is one of the most generously sized standalone homes currently available in Lokogoma.\n\nPromenade Estate Cluster 7 is a serene, well-managed community with real infrastructure and real amenities. Verified by MiddlePark — title and physical inspection confirmed before listing.',
+    description: '400 sqm. Fully detached. 4 bedrooms. 5 bathrooms. Green spaces. Recreational facilities. The Promenade Mall a short walk away. This is not the average duplex — it is one of the most generously sized standalone homes currently available in Lokogoma.\n\nPromenade Estate Cluster 7 is a serene, well-managed community with real infrastructure and real amenities. Verified by Propabridge — title and physical inspection confirmed before listing.',
     highlights: [
       '4 bedrooms — all with bathroom access',
       '5 bathrooms — generous ratio for a 4-bed',
@@ -121,7 +121,7 @@ export const mockProperties: Property[] = [
       '/images/property-interior-kitchen.jpg',
     ],
     amenities: ['Generator', 'Borehole', 'Security', 'Parking', 'Garden'],
-    description: 'A well-maintained 3-bedroom flat in the heart of Gwarinpa — Abuja\'s largest residential estate. Spacious rooms, modern finishes, and uninterrupted power supply. Close to schools, hospitals, and shopping centres.\n\nVerified by MiddlePark — title and physical inspection confirmed before listing.',
+    description: 'A well-maintained 3-bedroom flat in the heart of Gwarinpa — Abuja\'s largest residential estate. Spacious rooms, modern finishes, and uninterrupted power supply. Close to schools, hospitals, and shopping centres.\n\nVerified by Propabridge — title and physical inspection confirmed before listing.',
     highlights: [
       '3 bedrooms — all with ensuite bathrooms',
       '180 sqm — spacious open-plan layout',
@@ -161,7 +161,7 @@ export const mockProperties: Property[] = [
       '/images/property-interior-kitchen.jpg',
     ],
     amenities: ['BQ', 'Swimming Pool', 'Generator', 'Borehole', 'Smart Gate', 'Garden', 'Terrace'],
-    description: 'A statement property in Kaduna\'s most exclusive gated community. 5 bedrooms, each ensuite, with a private swimming pool and BQ. Smart home-ready with automated security gate.\n\nMillennium City Estate offers 24/7 security, internal road infrastructure, and consistent power supply. Verified by MiddlePark.',
+    description: 'A statement property in Kaduna\'s most exclusive gated community. 5 bedrooms, each ensuite, with a private swimming pool and BQ. Smart home-ready with automated security gate.\n\nMillennium City Estate offers 24/7 security, internal road infrastructure, and consistent power supply. Verified by Propabridge.',
     highlights: [
       '5 ensuite bedrooms',
       'Private swimming pool',
@@ -192,7 +192,7 @@ export const mockProperties: Property[] = [
       '/images/property-interior-kitchen.jpg',
     ],
     amenities: ['BQ', 'Swimming Pool', 'Generator', 'Borehole', 'Garden', 'Security', 'Terrace', 'Balcony'],
-    description: 'An architect-designed villa in the prestigious Maitama diplomatic zone. Expansive living spaces, landscaped gardens, and resort-level amenities. Walking distance to embassies, shops, and restaurants.\n\nVerified by MiddlePark — title and physical inspection confirmed before listing.',
+    description: 'An architect-designed villa in the prestigious Maitama diplomatic zone. Expansive living spaces, landscaped gardens, and resort-level amenities. Walking distance to embassies, shops, and restaurants.\n\nVerified by Propabridge — title and physical inspection confirmed before listing.',
     highlights: [
       '4 bedrooms — all ensuite with premium finishes',
       '5 bathrooms — including guest powder room',
@@ -221,7 +221,7 @@ export const mockProperties: Property[] = [
       '/images/property-interior-living.jpg',
     ],
     amenities: ['Generator', 'Security', 'Parking', 'Garden', 'Balcony'],
-    description: 'A modern terrace duplex steps from Jabi Lake. Open-plan living with high ceilings, a private garden, and views of the lake. Ideal for young professionals and families.\n\nVerified by MiddlePark.',
+    description: 'A modern terrace duplex steps from Jabi Lake. Open-plan living with high ceilings, a private garden, and views of the lake. Ideal for young professionals and families.\n\nVerified by Propabridge.',
     highlights: [
       '3 bedrooms — all ensuite',
       '220 sqm total area',
@@ -249,7 +249,7 @@ export const mockProperties: Property[] = [
       '/images/property-interior-kitchen.jpg',
     ],
     amenities: ['Generator', 'Security', 'Parking'],
-    description: 'A compact, well-finished 2-bedroom apartment in the commercial heart of Wuse 2. Close to restaurants, banks, and nightlife. Ideal for single professionals or couples.\n\nVerified by MiddlePark.',
+    description: 'A compact, well-finished 2-bedroom apartment in the commercial heart of Wuse 2. Close to restaurants, banks, and nightlife. Ideal for single professionals or couples.\n\nVerified by Propabridge.',
     highlights: [
       '2 ensuite bedrooms',
       '120 sqm — efficient layout',
