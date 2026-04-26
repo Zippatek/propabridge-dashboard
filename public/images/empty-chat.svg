@@ -1,0 +1,14 @@
+<svg width="320" height="240" viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="240" fill="#f4f3ea" rx="12"/>
+  <!-- Large speech bubble (left) -->
+  <path d="M100 80H200C206 80 210 84 210 90V140C210 146 206 150 200 150H140L120 168V150H100C94 150 90 146 90 140V90C90 84 94 80 100 80Z" stroke="#001a40" stroke-width="2" fill="none"/>
+  <!-- House icon inside large bubble -->
+  <path d="M140 105L155 92L170 105V125H162V113H148V125H140V105Z" stroke="#001a40" stroke-width="1.5" fill="none"/>
+  <path d="M135 108L155 88L175 108" stroke="#001a40" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Small speech bubble (right) -->
+  <path d="M190 130H230C234 130 236 132 236 136V156C236 160 234 162 230 162H210L200 172V162H190C186 162 184 160 184 156V136C184 132 186 130 190 130Z" stroke="#001a40" stroke-width="2" fill="none"/>
+  <!-- Dots in small bubble -->
+  <circle cx="203" cy="148" r="3" fill="#001a40"/>
+  <circle cx="213" cy="148" r="3" fill="#001a40"/>
+  <circle cx="223" cy="148" r="3" fill="#001a40"/>
+</svg>

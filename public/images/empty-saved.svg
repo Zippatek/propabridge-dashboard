@@ -1,0 +1,11 @@
+<svg width="320" height="240" viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="240" fill="#f4f3ea" rx="12"/>
+  <!-- House -->
+  <path d="M160 60L110 100V170H150V130H170V170H210V100L160 60Z" stroke="#001a40" stroke-width="2" fill="none"/>
+  <!-- Roof detail -->
+  <path d="M100 105L160 55L220 105" stroke="#001a40" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Heart -->
+  <path d="M145 115C145 108 152 102 160 110C168 102 175 108 175 115C175 125 160 135 160 135C160 135 145 125 145 115Z" stroke="#001a40" stroke-width="2" fill="none"/>
+  <!-- Chimney -->
+  <rect x="180" y="68" width="12" height="22" stroke="#001a40" stroke-width="2" fill="none" rx="1"/>
+</svg>

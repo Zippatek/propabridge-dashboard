@@ -1,0 +1,342 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── MIDDLEPARK GLOBAL STYLES ───────────────────────────────── */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-inter-display), 'Inter Display', 'Inter', system-ui, sans-serif;
+    color: #001a40;
+    background: #f4f3ea;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ─── TYPOGRAPHY DEFAULTS ─────────────────────────────────── */
+  h1 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: #001a40;
+  }
+
+  @media (min-width: 1200px) {
+    h1 {
+      font-size: 40px;
+      letter-spacing: -1.1px;
+      line-height: 110%;
+      margin-bottom: 40px;
+    }
+  }
+
+  h2 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: #001a40;
+  }
+
+  @media (min-width: 1200px) {
+    h2 {
+      font-size: 40px;
+      letter-spacing: -1.1px;
+      line-height: 110%;
+    }
+  }
+
+  h3 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    color: #001a40;
+  }
+
+  h4 {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #001a40;
+  }
+
+  p {
+    font-size: 15px;
+    font-weight: 400;
+    color: #4a5568;
+    line-height: 1.6;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+    font-size: inherit;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* ─── UTILITY CLASSES ─────────────────────────────────────────── */
+
+@layer components {
+  .caption {
+    font-size: 12px;
+    font-weight: 400;
+    color: #4a5568;
+    line-height: 1.4;
+  }
+
+  .badge-text {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+  }
+
+  /* Hide scrollbar but allow scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom focus ring */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent;
+  }
+
+  /* ─── MICRO-ANIMATIONS ───────────────────────────────────── */
+
+  /* Notification pulse */
+  @keyframes pulse-dot {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.15);
+    }
+  }
+  .animate-pulse-dot {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  /* Staggered fade-up entrance */
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-up {
+    animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-up-1 { animation-delay: 0.05s; }
+  .animate-fade-up-2 { animation-delay: 0.1s; }
+  .animate-fade-up-3 { animation-delay: 0.15s; }
+  .animate-fade-up-4 { animation-delay: 0.2s; }
+  .animate-fade-up-5 { animation-delay: 0.25s; }
+  .animate-fade-up-6 { animation-delay: 0.3s; }
+
+  /* Scale-in (for cards and modals) */
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Slide in from left */
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .animate-slide-in-left {
+    animation: slideInLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Gentle float — for decorative elements */
+  @keyframes gentleFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-float {
+    animation: gentleFloat 4s ease-in-out infinite;
+  }
+  .animate-float-delayed {
+    animation: gentleFloat 4s ease-in-out 1s infinite;
+  }
+
+  /* Shimmer effect for loading / accents */
+  @keyframes shimmer {
+    from { background-position: -400px 0; }
+    to { background-position: 400px 0; }
+  }
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.3) 50%,
+      rgba(255,255,255,0) 100%
+    );
+    background-size: 400px 100%;
+    animation: shimmer 2.5s ease-in-out infinite;
+  }
+
+  /* Typing indicator dots */
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+  }
+  .animate-typing-1 { animation: typingBounce 1.2s ease-in-out infinite; }
+  .animate-typing-2 { animation: typingBounce 1.2s ease-in-out 0.15s infinite; }
+  .animate-typing-3 { animation: typingBounce 1.2s ease-in-out 0.3s infinite; }
+
+  /* CTA glow pulse */
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 106, 255, 0.3); }
+    50% { box-shadow: 0 0 0 8px rgba(0, 106, 255, 0); }
+  }
+  .animate-glow {
+    animation: glowPulse 2.5s ease-in-out infinite;
+  }
+
+  /* Counter number roll */
+  @keyframes countUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-count-up {
+    animation: countUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* ─── GLASS MORPHISM UTILITIES ───────────────────────────── */
+
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+
+  .glass-dark {
+    background: rgba(0, 26, 64, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 106, 255, 0.15);
+  }
+
+  /* ─── GRADIENT UTILITIES ─────────────────────────────────── */
+
+  .gradient-navy {
+    background: linear-gradient(135deg, #001a40 0%, #002a66 60%, #003d99 100%);
+  }
+
+  .gradient-navy-radial {
+    background: radial-gradient(ellipse at 30% 20%, rgba(0,106,255,0.15) 0%, transparent 60%),
+                linear-gradient(135deg, #001a40 0%, #001230 100%);
+  }
+
+  .gradient-text-gold {
+    background: linear-gradient(135deg, #ffc870 0%, #ffb347 50%, #ffd48a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ─── ENHANCED CARD EFFECTS ──────────────────────────────── */
+
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 26, 64, 0.12);
+  }
+
+  .card-lift {
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 26, 64, 0.1);
+  }
+}
+
+/* ─── CUSTOM SCROLLBAR (thin, subtle) ────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

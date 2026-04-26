@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring -->
+  <circle cx="32" cy="32" r="30" stroke="#006aff" stroke-width="2" fill="#001a40"/>
+  <!-- Letter P -->
+  <text x="32" y="36" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="700" fill="#006aff">P</text>
+  <!-- PROPA text -->
+  <text x="32" y="50" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="8" font-weight="600" fill="white" letter-spacing="0.5">PROPA</text>
+</svg>

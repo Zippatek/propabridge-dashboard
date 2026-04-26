@@ -1,0 +1,17 @@
+<svg width="320" height="240" viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="240" fill="#f4f3ea" rx="12"/>
+  <!-- Calendar -->
+  <rect x="115" y="75" width="90" height="85" rx="6" stroke="#001a40" stroke-width="2" fill="none"/>
+  <!-- Calendar header -->
+  <line x1="115" y1="100" x2="205" y2="100" stroke="#001a40" stroke-width="2"/>
+  <!-- Calendar hangers -->
+  <line x1="140" y1="70" x2="140" y2="82" stroke="#001a40" stroke-width="2" stroke-linecap="round"/>
+  <line x1="180" y1="70" x2="180" y2="82" stroke="#001a40" stroke-width="2" stroke-linecap="round"/>
+  <!-- Check mark -->
+  <path d="M140 125L155 140L185 110" stroke="#001a40" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Clock circle (small, bottom-right) -->
+  <circle cx="200" cy="155" r="18" stroke="#001a40" stroke-width="2" fill="#f4f3ea"/>
+  <!-- Clock hands -->
+  <line x1="200" y1="155" x2="200" y2="145" stroke="#001a40" stroke-width="2" stroke-linecap="round"/>
+  <line x1="200" y1="155" x2="208" y2="155" stroke="#001a40" stroke-width="2" stroke-linecap="round"/>
+</svg>
