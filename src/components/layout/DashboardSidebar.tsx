@@ -6,24 +6,23 @@ import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import {
   LayoutDashboard,
-  Heart,
   Calendar,
-  MessageCircle,
+  FileText,
+  ShieldCheck,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
   X,
-  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { mockUser } from '@/lib/mock-data'
+import { useSession, signOut } from 'next-auth/react'
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-  { icon: Heart, label: 'Saved Properties', href: '/dashboard/saved' },
+  { icon: LayoutDashboard, label: 'My Deal', href: '/dashboard' },
   { icon: Calendar, label: 'Inspections', href: '/dashboard/inspections' },
-  { icon: MessageCircle, label: 'Chat with Propa', href: '/dashboard/chat' },
+  { icon: FileText, label: 'Documents', href: '/dashboard/documents' },
+  { icon: ShieldCheck, label: 'Verification', href: '/dashboard/verification' },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ]
 
@@ -42,6 +41,10 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSidebarProps) {
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const { data: session } = useSession()
+  const userName = session?.user?.name || 'User'
+  const userEmail = session?.user?.email || ''
+  const userImage = session?.user?.image || '/images/avatar-default.jpg'
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -123,15 +126,22 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
         })}
       </nav>
 
-      {/* CTA button */}
+      {/* CTA — Continue on WhatsApp (Propa lives there, not in-app) */}
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          <Link href="/dashboard/chat" onClick={onMobileClose}>
-            <button className="w-full bg-navy text-white px-5 py-2.5 rounded-button text-nav font-semibold flex items-center justify-center gap-2 hover:bg-[#002555] transition-all duration-200 group shadow-sm hover:shadow-md">
-              <Sparkles size={14} className="text-gold" />
-              CHAT WITH PROPA <ChevronRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+          <a
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onMobileClose}
+          >
+            <button className="w-full bg-[#25D366] text-white px-5 py-2.5 rounded-button text-nav font-semibold flex items-center justify-center gap-2 hover:bg-[#1da851] transition-all duration-200 group shadow-sm hover:shadow-md">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0">
+                <path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607z"/>
+              </svg>
+              CONTINUE ON WHATSAPP <ChevronRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </button>
-          </Link>
+          </a>
         </div>
       )}
 
@@ -143,8 +153,8 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
         <div className={cn('flex items-center gap-3', isCollapsed && 'flex-col gap-2')}>
           <div className="w-10 h-10 rounded-avatar overflow-hidden flex-shrink-0 bg-beige ring-2 ring-beige/50">
             <Image
-              src="/images/avatar-default.jpg"
-              alt={mockUser.name}
+              src={userImage}
+              alt={userName}
               width={40}
               height={40}
               className="object-cover w-full h-full"
@@ -153,14 +163,15 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-body-sm font-semibold text-navy truncate">
-                {mockUser.name}
+                {userName}
               </p>
               <p className="text-caption text-subtle truncate">
-                {mockUser.email}
+                {userEmail}
               </p>
             </div>
           )}
           <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
             className={cn(
               'flex-shrink-0 text-subtle hover:text-danger transition-all duration-200 hover:scale-105',
               isCollapsed && 'mt-1'

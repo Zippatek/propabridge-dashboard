@@ -64,6 +64,7 @@ export const metadata: Metadata = {
 }
 
 import { CustomCursor } from '@/components/ui/CustomCursor'
+import { Providers } from './providers'
 
 export default function RootLayout({
   children,
@@ -73,8 +74,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={interDisplay.variable}>
       <body className={interDisplay.className}>
-        <CustomCursor />
-        {children}
+        <Providers>
+          <CustomCursor />
+          {children}
+        </Providers>
       </body>
     </html>
   )

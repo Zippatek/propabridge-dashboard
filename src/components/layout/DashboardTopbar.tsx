@@ -3,13 +3,13 @@
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { Search, Bell, Menu } from 'lucide-react'
-import { mockUser } from '@/lib/mock-data'
+import { useSession } from 'next-auth/react'
 
 const pageTitles: Record<string, string> = {
-  '/dashboard': 'Overview',
-  '/dashboard/saved': 'Saved Properties',
+  '/dashboard': 'My Deal',
   '/dashboard/inspections': 'Inspections',
-  '/dashboard/chat': 'Chat with Propa',
+  '/dashboard/documents': 'Documents',
+  '/dashboard/verification': 'Verification',
   '/dashboard/settings': 'Settings',
 }
 
@@ -25,6 +25,9 @@ interface DashboardTopbarProps {
 export function DashboardTopbar({ onMenuToggle }: DashboardTopbarProps) {
   const pathname = usePathname()
   const pageTitle = pageTitles[pathname] || 'Dashboard'
+  const { data: session } = useSession()
+  const userName = session?.user?.name || 'User'
+  const userImage = session?.user?.image || '/images/avatar-default.jpg'
 
   return (
     <header className="h-18 bg-white/90 backdrop-blur-md border-b border-divider flex items-center px-6 gap-4 sticky top-0 z-30">
@@ -74,15 +77,15 @@ export function DashboardTopbar({ onMenuToggle }: DashboardTopbarProps) {
         <button className="flex items-center gap-2.5 px-2 py-1.5 rounded-badge hover:bg-beige transition-all duration-200 group" aria-label="Profile menu">
           <div className="w-9 h-9 rounded-avatar overflow-hidden bg-beige flex-shrink-0 ring-2 ring-transparent group-hover:ring-action/20 transition-all duration-200">
             <Image
-              src="/images/avatar-default.jpg"
-              alt={mockUser.name}
+              src={userImage}
+              alt={userName}
               width={36}
               height={36}
               className="object-cover w-full h-full"
             />
           </div>
           <span className="text-body-sm font-medium text-navy hidden lg:inline">
-            {mockUser.name.split(' ')[0]}
+            {userName.split(' ')[0]}
           </span>
         </button>
       </div>

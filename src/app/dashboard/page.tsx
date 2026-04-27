@@ -1,53 +1,91 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
-import { Heart, Calendar, Eye, MessageCircle, MapPin, ChevronRight, Shield, Sparkles } from 'lucide-react'
-import { StatCard, PropertyCard } from '@/components/ui'
-import { mockProperties, mockUser, getPropertyById } from '@/lib/mock-data'
+import { useSession } from 'next-auth/react'
+import {
+  Calendar,
+  FileText,
+  ShieldCheck,
+  ChevronRight,
+  Shield,
+  MapPin,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+} from 'lucide-react'
+import { customer } from '@/lib/customer-api'
+import { formatDateTime } from '@/lib/format'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+
+interface DealAppointment {
+  id: string
+  status?: string
+  scheduled_for?: string
+  date?: string
+  time?: string
+  property_id?: string
+  property_title?: string
+  property_address?: string
+}
+
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'
 
 /**
- * Dashboard Overview Page
- * FOUNDATION.md Section 8.1
+ * "My Deal" — the customer Deal Room.
+ *
+ * Replaces the marketplace-style overview (recommendations, saved listings)
+ * with the only thing a high-touch property buyer cares about post-engagement:
+ * what's the status of their active inspection, what docs are pending,
+ * and where do they pick up the conversation with Propa.
  */
-export default function DashboardOverviewPage() {
-  const upcomingInspection = mockUser.inspections.find((i) => i.status === 'upcoming')
-  const inspectionProperty = upcomingInspection
-    ? getPropertyById(upcomingInspection.propertyId)
-    : null
+export default function DashboardPage() {
+  const { data: session } = useSession()
+  const firstName = (session?.user?.name || 'there').split(' ')[0]
+  const kycStatus = (session?.user as { kyc_status?: string } | undefined)?.kyc_status || 'pending'
+
+  const [nextInspection, setNextInspection] = useState<DealAppointment | null | undefined>(undefined)
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+    customer
+      .get<{ items?: DealAppointment[]; data?: DealAppointment[] } | DealAppointment[]>(
+        `/scheduler/appointments?user_id=${session.user.id}&limit=10`,
+      )
+      .then((v) => {
+        const list = Array.isArray(v) ? v : v.items || v.data || []
+        const upcoming = list
+          .filter((a) => {
+            const when = a.scheduled_for || a.date
+            return when && new Date(when).getTime() > Date.now()
+          })
+          .sort((a, b) => {
+            const ta = new Date(a.scheduled_for || a.date || 0).getTime()
+            const tb = new Date(b.scheduled_for || b.date || 0).getTime()
+            return ta - tb
+          })[0]
+        setNextInspection(upcoming || null)
+      })
+      .catch(() => setNextInspection(null))
+  }, [session?.user?.id])
 
   return (
     <div className="space-y-8">
-      {/* ─── Welcome Banner ──────────────────────────── */}
+      {/* Hero — Continue on WhatsApp (Propa is the primary surface) */}
       <section className="relative overflow-hidden rounded-card animate-fade-up">
-        {/* Gradient background with radial accent */}
         <div className="absolute inset-0 gradient-navy-radial" />
-        
-        {/* Background image */}
         <div className="absolute inset-0">
           <Image
             src="/images/dashboard-hero-banner.jpg"
-            alt="Premium residential estate"
+            alt=""
             fill
             className="object-cover mix-blend-soft-light opacity-40"
             priority
           />
         </div>
-
-        {/* Animated decorative elements */}
         <div className="absolute top-6 right-8 w-20 h-20 rounded-full bg-action/10 blur-2xl animate-float" />
         <div className="absolute bottom-4 right-24 w-14 h-14 rounded-full bg-gold/15 blur-xl animate-float-delayed" />
-        
-        {/* Subtle grid pattern overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
 
-        {/* Content */}
         <div className="relative z-10 p-8 lg:p-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="max-w-lg">
             <div className="flex items-center gap-2 mb-3">
@@ -57,138 +95,161 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
             <h2 className="text-[32px] lg:text-[36px] font-bold text-white leading-[1.15] tracking-tight">
-              Good morning, {mockUser.name.split(' ')[0]} 👋
+              Welcome back, {firstName}.
             </h2>
-            <p className="text-[16px] text-white/70 mt-3 leading-relaxed">
-              You have <span className="text-white font-semibold">{mockUser.savedProperties.length} properties</span> saved and{' '}
-              <span className="text-white font-semibold">{mockUser.inspections.filter((i) => i.status === 'upcoming').length} inspection</span>{' '}
-              booked.
+            <p className="text-[16px] text-white/75 mt-3 leading-relaxed">
+              Propa is on WhatsApp. Continue your conversation, browse new matches, or
+              book another viewing — all in one chat.
             </p>
           </div>
-          <Link href="/dashboard/saved">
-            <button className="bg-action hover:bg-action-hover text-white font-semibold px-7 py-3.5 rounded-button transition-all duration-200 flex items-center gap-2 whitespace-nowrap animate-glow group">
-              Browse Verified Listings 
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <button className="bg-[#25D366] hover:bg-[#1da851] text-white font-semibold px-7 py-3.5 rounded-button transition-all duration-200 flex items-center gap-2 whitespace-nowrap group shadow-lg">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607z" />
+              </svg>
+              Continue on WhatsApp
               <ChevronRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </button>
-          </Link>
+          </a>
         </div>
       </section>
 
-      {/* ─── Quick Stats ─────────────────────────────── */}
-      <section>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            icon={Heart}
-            iconColor="#ffc870"
-            iconBgColor="rgba(255, 200, 112, 0.12)"
-            value={String(mockUser.savedProperties.length)}
-            label="Properties saved"
-            trend="+1 this week"
-            delay={50}
-          />
-          <StatCard
-            icon={Calendar}
-            iconColor="#006aff"
-            iconBgColor="rgba(0, 106, 255, 0.08)"
-            value={String(mockUser.inspections.filter((i) => i.status === 'upcoming').length)}
-            label="Upcoming visits"
-            delay={100}
-          />
-          <StatCard
-            icon={Eye}
-            iconColor="#001a40"
-            iconBgColor="#f0f4ff"
-            value="12"
-            label="Properties viewed"
-            trend="+4 this week"
-            delay={150}
-          />
-          <StatCard
-            icon={MessageCircle}
-            iconColor="#1a7a4a"
-            iconBgColor="rgba(26, 122, 74, 0.08)"
-            value="5"
-            label="Propa conversations"
-            delay={200}
-          />
-        </div>
-      </section>
-
-      {/* ─── Upcoming Inspection ─────────────────────── */}
-      {upcomingInspection && inspectionProperty && (
-        <section className="animate-fade-up animate-fade-up-3">
-          <div className="bg-white rounded-card border border-[#e2e8f0] p-6 shadow-card card-lift flex flex-col sm:flex-row gap-6 relative overflow-hidden">
-            {/* Subtle left accent gradient */}
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-action via-action/60 to-transparent rounded-l-card" />
-
+      {/* Next inspection — the single highest-value card on this page */}
+      <section className="animate-fade-up animate-fade-up-2">
+        <h3 className="text-h4 text-navy mb-3">Your next inspection</h3>
+        {nextInspection === undefined ? (
+          <div className="bg-white rounded-card border border-divider p-8">
+            <LoadingSpinner size="sm" />
+          </div>
+        ) : nextInspection === null ? (
+          <div className="bg-white rounded-card border border-divider p-8 text-center">
+            <Calendar size={32} strokeWidth={1.2} className="text-divider mx-auto mb-3" />
+            <p className="text-body-sm text-subtle">
+              No upcoming inspections. Chat with Propa to book one.
+            </p>
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-4 text-action font-semibold text-body-sm hover:text-action-hover"
+            >
+              Open WhatsApp →
+            </a>
+          </div>
+        ) : (
+          <div className="bg-white rounded-card border border-divider p-6 shadow-card flex flex-col sm:flex-row gap-6 relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-action via-action/60 to-transparent" />
             <div className="flex items-start gap-4 flex-1 pl-3">
               <div className="w-12 h-12 rounded-card bg-gold-light flex items-center justify-center flex-shrink-0 animate-float">
                 <Calendar size={24} className="text-gold" strokeWidth={1.5} />
               </div>
               <div>
-                <p className="badge-text text-subtle uppercase tracking-wide">
-                  Upcoming Inspection
-                </p>
+                <p className="badge-text text-subtle uppercase tracking-wide">Confirmed</p>
                 <h4 className="text-h4 text-navy mt-1">
-                  {inspectionProperty.title}
+                  {nextInspection.property_title || `Property ${nextInspection.property_id || ''}`}
                 </h4>
-                <p className="flex items-center gap-1.5 text-caption text-subtle mt-1">
-                  <MapPin size={14} strokeWidth={1.5} />
-                  {inspectionProperty.location}
+                {nextInspection.property_address && (
+                  <p className="flex items-center gap-1.5 text-caption text-subtle mt-1">
+                    <MapPin size={14} strokeWidth={1.5} />
+                    {nextInspection.property_address}
+                  </p>
+                )}
+                <p className="flex items-center gap-1.5 text-body-sm text-action font-medium mt-3">
+                  <Calendar size={14} strokeWidth={1.5} />
+                  {formatDateTime(nextInspection.scheduled_for || nextInspection.date)}
                 </p>
-                <div className="flex items-center gap-4 mt-3">
-                  <span className="flex items-center gap-1.5 text-body-sm text-action font-medium">
-                    <Calendar size={14} strokeWidth={1.5} />
-                    {upcomingInspection.date} at {upcomingInspection.time}
-                  </span>
-                  <span className="text-caption text-subtle">
-                    #{upcomingInspection.confirmationNumber}
-                  </span>
-                </div>
               </div>
             </div>
-            <div className="flex items-start gap-3 sm:flex-col">
-              <button className="bg-transparent border-[1.5px] border-navy text-navy font-semibold px-5 py-2 rounded-button text-body-sm hover:bg-beige transition-all duration-150">
-                View on Map
-              </button>
-              <button className="text-body-sm font-medium text-subtle hover:text-navy transition-colors duration-150 px-5 py-2">
-                Reschedule
-              </button>
-            </div>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
-      {/* ─── Recommended Properties ──────────────────── */}
-      <section className="animate-fade-up animate-fade-up-4">
-        <div className="flex items-baseline justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-h2 text-navy">Recommended for you</h2>
-              <Sparkles size={18} className="text-gold" strokeWidth={1.5} />
-            </div>
-            <p className="text-body text-subtle mt-1">
-              Based on your search history and saved preferences
-            </p>
-          </div>
-          <Link
-            href="/dashboard/saved"
-            className="text-nav font-semibold text-action hover:text-action-hover transition-colors duration-150 hidden sm:flex items-center gap-1 group"
-          >
-            View all <ChevronRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockProperties.slice(0, 3).map((property, i) => (
-            <div key={property.id} className="animate-fade-up" style={{ animationDelay: `${300 + i * 80}ms` }}>
-              <PropertyCard
-                {...property}
-                isSaved={mockUser.savedProperties.includes(property.id)}
-              />
-            </div>
-          ))}
+      {/* Quick actions — what you can actually DO from this dashboard */}
+      <section className="animate-fade-up animate-fade-up-3">
+        <h3 className="text-h4 text-navy mb-3">Quick actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <ActionCard
+            href="/dashboard/inspections"
+            icon={Calendar}
+            iconColor="text-action"
+            iconBg="bg-action-light"
+            title="My Inspections"
+            body="Confirmed viewings, addresses, agent contact."
+          />
+          <ActionCard
+            href="/dashboard/documents"
+            icon={FileText}
+            iconColor="text-gold"
+            iconBg="bg-gold-light"
+            title="Documents"
+            body="Inspection reports, title docs, offer letters."
+          />
+          <ActionCard
+            href="/dashboard/verification"
+            icon={ShieldCheck}
+            iconColor={kycStatus === 'verified' ? 'text-verified' : 'text-warning'}
+            iconBg={kycStatus === 'verified' ? 'bg-verified-light' : 'bg-warning-light'}
+            title="Verification"
+            body={
+              kycStatus === 'verified'
+                ? 'Your KYC is approved.'
+                : kycStatus === 'pending'
+                  ? 'Submit ID + proof of address to close deals.'
+                  : 'Action needed on your KYC submission.'
+            }
+            badge={
+              kycStatus === 'verified' ? (
+                <CheckCircle2 size={14} className="text-verified" />
+              ) : kycStatus === 'pending' ? (
+                <Clock size={14} className="text-warning" />
+              ) : (
+                <AlertCircle size={14} className="text-danger" />
+              )
+            }
+          />
         </div>
       </section>
     </div>
+  )
+}
+
+function ActionCard({
+  href,
+  icon: Icon,
+  iconColor,
+  iconBg,
+  title,
+  body,
+  badge,
+}: {
+  href: string
+  icon: typeof Calendar
+  iconColor: string
+  iconBg: string
+  title: string
+  body: string
+  badge?: React.ReactNode
+}) {
+  return (
+    <a
+      href={href}
+      className="bg-white rounded-card border border-divider p-5 shadow-card card-lift block group"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 rounded-card ${iconBg} flex items-center justify-center`}>
+          <Icon size={20} className={iconColor} strokeWidth={1.6} />
+        </div>
+        {badge}
+      </div>
+      <h4 className="text-h4 text-navy">{title}</h4>
+      <p className="text-caption text-subtle mt-1 leading-relaxed">{body}</p>
+      <p className="text-nav font-semibold text-action mt-3 group-hover:text-action-hover transition-colors flex items-center gap-1">
+        Open <ChevronRight size={12} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+      </p>
+    </a>
   )
 }
