@@ -3,25 +3,24 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 /**
- * Two independent gates:
- *   /admin/*   → admin cookie session (single ADMIN_DASHBOARD_KEY)
- *   /dashboard → NextAuth JWT (real users from propabridge-backend)
- *
- * Public:  /, /login, /signup, /forgot-password, /admin/login, public APIs.
+ * Three independent gates:
+ *   /admin/*    → ADMIN cookie session (single ADMIN_DASHBOARD_KEY)
+ *   /agency/*   → AGENCY cookie session (token from /agency/auth/login)
+ *   /dashboard/*→ NextAuth JWT (real customer accounts)
  */
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // ── Admin gate ──────────────────────────────────────────
+  // ── Admin zone ──────────────────────────────────────────
   const isAdminLogin =
     pathname === '/admin/login' || pathname.startsWith('/api/admin-auth/login')
-  const isProtectedAdmin =
-    (pathname.startsWith('/admin') && !isAdminLogin) || pathname.startsWith('/api/admin/')
-
-  if (isProtectedAdmin) {
-    const isAdminAuthed = req.cookies.get('propa_admin_session')?.value === 'ok'
-    if (!isAdminAuthed) {
+  if (
+    (pathname.startsWith('/admin') && !isAdminLogin) ||
+    pathname.startsWith('/api/admin/')
+  ) {
+    const ok = req.cookies.get('propa_admin_session')?.value === 'ok'
+    if (!ok) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
@@ -32,10 +31,8 @@ export async function middleware(req: NextRequest) {
     }
     return NextResponse.next()
   }
-
   if (pathname === '/admin/login') {
-    const isAdminAuthed = req.cookies.get('propa_admin_session')?.value === 'ok'
-    if (isAdminAuthed) {
+    if (req.cookies.get('propa_admin_session')?.value === 'ok') {
       const url = req.nextUrl.clone()
       url.pathname = '/admin'
       url.search = ''
@@ -44,12 +41,38 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // ── Customer dashboard gate ─────────────────────────────
+  // ── Agency zone ─────────────────────────────────────────
+  const isAgencyLogin =
+    pathname === '/agency/login' || pathname.startsWith('/api/agency-auth/login')
+  if (
+    (pathname.startsWith('/agency') && !isAgencyLogin) ||
+    pathname.startsWith('/api/agency/')
+  ) {
+    const tok = req.cookies.get('propa_agency_session')?.value
+    if (!tok) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      const url = req.nextUrl.clone()
+      url.pathname = '/agency/login'
+      url.searchParams.set('next', pathname)
+      return NextResponse.redirect(url)
+    }
+    return NextResponse.next()
+  }
+  if (pathname === '/agency/login') {
+    if (req.cookies.get('propa_agency_session')?.value) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/agency'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+    return NextResponse.next()
+  }
+
+  // ── Customer zone ───────────────────────────────────────
   if (pathname.startsWith('/dashboard')) {
-    const token = await getToken({
-      req,
-      secret: process.env.NEXTAUTH_SECRET,
-    })
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
     if (!token) {
       const url = req.nextUrl.clone()
       url.pathname = '/login'
@@ -66,6 +89,9 @@ export const config = {
     '/admin/:path*',
     '/api/admin/:path*',
     '/api/admin-auth/:path*',
+    '/agency/:path*',
+    '/api/agency/:path*',
+    '/api/agency-auth/:path*',
     '/dashboard/:path*',
   ],
 }

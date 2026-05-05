@@ -1,0 +1,13 @@
+.gcloudignore
+.git
+.gitignore
+.next/
+node_modules/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.idea/
+.vscode/
+public/fonts/*.zip
