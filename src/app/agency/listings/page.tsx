@@ -172,10 +172,13 @@ export default function AgencyListingsPage() {
                   <div className="text-caption text-subtle">
                     {l.views ?? 0} views · {l.leads ?? 0} leads
                   </div>
-                  <button className="text-body-sm font-semibold text-action hover:text-action-hover flex items-center gap-1">
+                  <Link
+                    href={`/agency/listings/${l.id}/edit`}
+                    className="text-body-sm font-semibold text-action hover:text-action-hover flex items-center gap-1"
+                  >
                     <Edit size={12} strokeWidth={2} />
                     Edit
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

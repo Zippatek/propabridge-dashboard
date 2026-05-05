@@ -22,11 +22,14 @@ import {
   MapPin,
   DollarSign,
   Wrench,
+  Camera,
   CheckCircle2,
   AlertTriangle,
   Flag,
   ArrowRight,
   ArrowLeft,
+  Trash2,
+  Upload,
 } from 'lucide-react'
 import { agency } from '@/lib/agency-api'
 import { Button } from '@/components/ui/Button'
@@ -72,6 +75,9 @@ type FormState = {
   is_estate_unit: boolean
   estate_name: string
   construction_status: 'bare_land' | 'excavation' | 'foundation' | 'walling' | 'roofing' | 'finishing' | 'completed' | ''
+  // step 5 — photos + polygon
+  imageUrls: string[]
+  polygon_geojson: string
 }
 
 const INITIAL: FormState = {
@@ -108,6 +114,8 @@ const INITIAL: FormState = {
   is_estate_unit: false,
   estate_name: '',
   construction_status: 'completed',
+  imageUrls: [],
+  polygon_geojson: '',
 }
 
 const STEPS = [
@@ -115,6 +123,7 @@ const STEPS = [
   { key: 'location', label: 'Location & title', icon: MapPin },
   { key: 'pricing', label: 'Pricing', icon: DollarSign },
   { key: 'specs', label: 'Specs & seller', icon: Wrench },
+  { key: 'photos', label: 'Photos & map', icon: Camera },
   { key: 'review', label: 'Review', icon: CheckCircle2 },
 ] as const
 
@@ -125,6 +134,7 @@ export function ListingWizard() {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormState>(INITIAL)
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stepError, setStepError] = useState<string | null>(null)
   const [result, setResult] = useState<{
@@ -208,7 +218,8 @@ export function ListingWizard() {
         road_access: form.road_access || null,
         is_estate_unit: form.is_estate_unit,
         estate_name: form.is_estate_unit ? form.estate_name : null,
-        selling_entity_type: form.selling_entity_type,
+        images: form.imageUrls.length > 0 ? form.imageUrls : undefined,
+        polygon_geojson: form.polygon_geojson.trim() || undefined,
         selling_entity_legal_name: form.selling_entity_legal_name,
         cac_rc_number: form.cac_rc_number || null,
       }
@@ -274,7 +285,7 @@ export function ListingWizard() {
           <Button variant="ghost" onClick={() => router.push('/agency/listings')}>
             Back to listings
           </Button>
-          <Button onClick={() => { setResult(null); setStep(0); setForm(INITIAL) }}>
+          <Button onClick={() => { setResult(null); setStep(0); setForm({...INITIAL}) }}>
             Submit another
           </Button>
         </div>
@@ -419,6 +430,73 @@ export function ListingWizard() {
         {step === 4 && (
           <div className="space-y-5">
             <div>
+              <h2 className="text-h4 text-navy">Photos & map</h2>
+              <p className="text-body-sm text-subtle mt-1">Add photos and the property boundary. Photos sell; the polygon helps our geospatial cross-check.</p>
+            </div>
+
+            {/* Image upload */}
+            <div>
+              <label className="block text-nav font-medium text-navy mb-2">Listing photos</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {form.imageUrls.map((url, i) => (
+                  <div key={i} className="relative group rounded-input overflow-hidden border border-divider aspect-[4/3]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, imageUrls: f.imageUrls.filter((_, j) => j !== i) }))}
+                      className="absolute top-1 right-1 bg-navy/70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+                <label className={`flex flex-col items-center justify-center rounded-input border-2 border-dashed aspect-[4/3] cursor-pointer transition-colors ${uploading ? 'border-action bg-action-light/20 opacity-60' : 'border-divider hover:border-action hover:bg-beige/30'}`}>
+                  <Upload size={20} className="text-subtle mb-1" strokeWidth={1.5} />
+                  <span className="text-caption text-subtle">{uploading ? 'Uploading…' : 'Add photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setUploading(true)
+                      try {
+                        const { url } = await agency.uploadImage(file)
+                        setForm((f) => ({ ...f, imageUrls: [...f.imageUrls, url] }))
+                      } catch (err) {
+                        setError((err as Error).message)
+                      } finally {
+                        setUploading(false)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-caption text-subtle mt-2">JPEG, PNG, or WebP. Max 8 MB each. First photo becomes the cover.</p>
+            </div>
+
+            {/* Polygon GeoJSON */}
+            <div>
+              <label className="block text-nav font-medium text-navy mb-2">Property boundary (GeoJSON polygon)</label>
+              <textarea
+                value={form.polygon_geojson}
+                onChange={(e) => set('polygon_geojson', e.target.value)}
+                placeholder='{"type":"Polygon","coordinates":[[[3.42,7.48],[3.43,7.48],[3.43,7.49],[3.42,7.49],[3.42,7.48]]]}'
+                rows={4}
+                className="w-full px-3 py-2.5 rounded-input border border-divider bg-white text-body-sm font-mono text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
+              />
+              <p className="text-caption text-subtle mt-1">Optional. Paste a GeoJSON polygon for the geospatial cross-check. A map drawing tool is coming soon.</p>
+            </div>
+          </div>
+        )}
+
+        {step === 5 && (
+          <div className="space-y-5">
+            <div>
               <h2 className="text-h4 text-navy">Review</h2>
               <p className="text-body-sm text-subtle mt-1">
                 Check the details below. After submit, our verification team
@@ -451,6 +529,10 @@ export function ListingWizard() {
               ['CAC #', form.cac_rc_number || '—'],
               ['Construction', form.construction_status.replace('_', ' ')],
               ['Utilities', `${form.power_supply} / ${form.water_supply} / ${form.sewage}`],
+            ]} />
+            <ReviewBlock title="Photos & map" rows={[
+              ['Photos', `${form.imageUrls.length} uploaded`],
+              ['Polygon', form.polygon_geojson ? 'Provided' : 'Not provided'],
             ]} />
           </div>
         )}
