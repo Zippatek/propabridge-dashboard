@@ -44,10 +44,9 @@ export default function AgencyAcceptInvitePage() {
         setError(data.error || 'Failed to accept invite')
         return
       }
-      // Store the session token
-      if (data.token) {
-        document.cookie = `agency_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax`
-      }
+      // The proxy already set the httpOnly session cookie server-side; we
+      // just navigate. (Never set agency cookies from the client — they
+      // must be httpOnly and the middleware reads propa_agency_session.)
       setSuccess(true)
       setTimeout(() => router.push('/agency'), 2000)
     } catch (err) {
