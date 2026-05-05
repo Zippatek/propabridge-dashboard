@@ -32,7 +32,7 @@ export const authConfig: NextAuthConfig = {
         if (!credentials?.email || !credentials?.password) return null
 
         // Demo user overrides for local testing
-        if (credentials.email === 'demo@propabridge.com' && credentials.password === 'demo123') {
+        if (credentials.email === 'demo@propabridge.com' && credentials.password === 'demo12345678') {
           return {
             id: 'demo-buyer-123',
             name: 'Demo Buyer',
@@ -42,8 +42,8 @@ export const authConfig: NextAuthConfig = {
             kyc_status: 'approved',
           }
         }
-        
-        if (credentials.email === 'agency@propabridge.com' && credentials.password === 'demo123') {
+
+        if (credentials.email === 'agency@propabridge.com' && credentials.password === 'demo12345678') {
           return {
             id: 'demo-agency-123',
             name: 'Demo Agency',
@@ -53,7 +53,7 @@ export const authConfig: NextAuthConfig = {
             kyc_status: 'approved',
           }
         }
-        
+
         if (credentials.email === 'admin@propabridge.com' && credentials.password === 'demo123') {
           return {
             id: 'demo-admin-123',
@@ -120,8 +120,8 @@ export const authConfig: NextAuthConfig = {
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
-        ;(session.user as { role?: string; kyc_status?: string }).role = token.role as string
-        ;(session.user as { kyc_status?: string }).kyc_status = token.kyc_status as string
+          ; (session.user as { role?: string; kyc_status?: string }).role = token.role as string
+          ; (session.user as { kyc_status?: string }).kyc_status = token.kyc_status as string
       }
       return session
     },
