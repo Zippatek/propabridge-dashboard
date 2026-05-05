@@ -38,8 +38,15 @@ export default function AgencyProfilePage() {
     if (!profile) return
     setSaving(true)
     setSaved(false)
+    // Only send fields the backend allows editing (name, phone, address,
+    // logo_url, payout_account_name/number/bank). Commission rate and
+    // email are admin-only / identity fields — silently dropped by backend.
+    const { name, phone, address, payout_account_name, payout_account_number, payout_bank } = profile
     try {
-      await agency.send<Profile>('/profile', 'PATCH', profile)
+      await agency.send<Profile>('/profile', 'PATCH', {
+        name, phone, address,
+        payout_account_name, payout_account_number, payout_bank,
+      })
       setSaved(true)
     } catch (err) {
       alert((err as Error).message)
@@ -77,8 +84,8 @@ export default function AgencyProfilePage() {
             label="Email"
             type="email"
             value={profile.email}
-            onChange={(e) => set('email', e.target.value)}
-            required
+            readOnly
+            helperText="Contact support to change email"
           />
           <Input
             label="Phone"
@@ -96,17 +103,14 @@ export default function AgencyProfilePage() {
       <section className="bg-white rounded-card border border-divider shadow-card p-6">
         <h2 className="text-h4 text-navy mb-1">Partnership terms</h2>
         <p className="text-caption text-subtle mb-5">
-          Negotiated with Propabridge. Edit only with partnerships team approval.
+          Set by Propabridge partnerships team. Contact support to negotiate changes.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Commission rate (%)"
-            type="number"
-            step="0.5"
-            value={String(profile.commission_rate * 100)}
-            onChange={(e) =>
-              set('commission_rate', Math.max(0, Math.min(100, Number(e.target.value))) / 100)
-            }
+            type="text"
+            value={`${Math.round(profile.commission_rate * 100)}%`}
+            readOnly
           />
         </div>
       </section>

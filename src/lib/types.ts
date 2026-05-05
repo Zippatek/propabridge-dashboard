@@ -104,6 +104,19 @@ export interface BackendAppointment {
   [key: string]: unknown
 }
 
+export interface Agency {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  address?: string
+  status: 'active' | 'paused' | 'suspended' | 'invited'
+  commission_rate: number
+  listings_count: number
+  closings_count: number
+  created_at: string
+}
+
 export interface BackendListing {
   id: string
   title?: string

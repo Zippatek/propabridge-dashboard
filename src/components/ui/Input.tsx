@@ -36,6 +36,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               'focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent',
               'text-body transition-all duration-150',
               error ? 'border-danger' : 'border-divider',
+              props.readOnly && 'bg-beige/50 cursor-default focus:ring-0',
               isPassword && 'pr-12',
               className
             )}

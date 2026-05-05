@@ -17,6 +17,8 @@ import {
   ChevronRight,
   X,
   ShieldCheck,
+  Building2,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +31,8 @@ const sections: Array<{
     items: [
       { icon: LayoutDashboard, label: 'Overview', href: '/admin' },
       { icon: Users, label: 'Users', href: '/admin/users' },
+      { icon: Building2, label: 'Agencies', href: '/admin/agencies' },
+      { icon: ClipboardCheck, label: 'Verifications', href: '/admin/verifications' },
       { icon: Mail, label: 'Inquiries', href: '/admin/inquiries' },
       { icon: Calendar, label: 'Inspections', href: '/admin/inspections' },
     ],
