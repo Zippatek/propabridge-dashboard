@@ -31,6 +31,40 @@ export const authConfig: NextAuthConfig = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
+        // Demo user overrides for local testing
+        if (credentials.email === 'demo@propabridge.com' && credentials.password === 'demo123') {
+          return {
+            id: 'demo-buyer-123',
+            name: 'Demo Buyer',
+            email: 'demo@propabridge.com',
+            image: null,
+            role: 'buyer',
+            kyc_status: 'approved',
+          }
+        }
+        
+        if (credentials.email === 'agency@propabridge.com' && credentials.password === 'demo123') {
+          return {
+            id: 'demo-agency-123',
+            name: 'Demo Agency',
+            email: 'agency@propabridge.com',
+            image: null,
+            role: 'agency',
+            kyc_status: 'approved',
+          }
+        }
+        
+        if (credentials.email === 'admin@propabridge.com' && credentials.password === 'demo123') {
+          return {
+            id: 'demo-admin-123',
+            name: 'Demo Admin',
+            email: 'admin@propabridge.com',
+            image: null,
+            role: 'admin',
+            kyc_status: 'approved',
+          }
+        }
+
         try {
           const res = await fetch(`${BACKEND_BASE}/auth/login`, {
             method: 'POST',
