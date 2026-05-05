@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Plus, Edit, Building2, MapPin, BedDouble } from 'lucide-react'
 import { Badge } from '@/components/ui'
 import { agency } from '@/lib/agency-api'
@@ -69,19 +70,27 @@ export default function AgencyListingsPage() {
             </button>
           ))}
         </div>
-        <button className="bg-action hover:bg-action-hover text-white font-semibold px-5 py-3 rounded-button flex items-center gap-2 self-start sm:self-auto">
+        <Link
+          href="/agency/listings/new"
+          className="bg-action hover:bg-action-hover text-white font-semibold px-5 py-3 rounded-button flex items-center gap-2 self-start sm:self-auto"
+        >
           <Plus size={16} strokeWidth={2} />
           Add listing
-        </button>
+        </Link>
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-card border border-divider p-12 text-center">
           <Building2 size={32} strokeWidth={1.2} className="text-divider mx-auto mb-3" />
-          <p className="text-body-sm text-subtle">
-            No {filter === 'all' ? '' : filter + ' '}listings yet. Click <b>Add listing</b> to
-            upload your first property.
+          <p className="text-body-sm text-subtle mb-4">
+            No {filter === 'all' ? '' : filter + ' '}listings yet.
           </p>
+          <Link
+            href="/agency/listings/new"
+            className="inline-flex items-center gap-2 bg-action hover:bg-action-hover text-white font-semibold px-5 py-3 rounded-button"
+          >
+            <Plus size={16} strokeWidth={2} /> Submit your first listing
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
