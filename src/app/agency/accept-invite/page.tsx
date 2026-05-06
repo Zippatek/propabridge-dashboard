@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Building2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
-export default function AgencyAcceptInvitePage() {
+function AgencyAcceptInviteView() {
   const params = useSearchParams()
   const router = useRouter()
   const token = params.get('token')
@@ -110,5 +111,13 @@ export default function AgencyAcceptInvitePage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function AgencyAcceptInvitePage() {
+  return (
+    <Suspense fallback={<LoadingSpinner size="lg" />}>
+      <AgencyAcceptInviteView />
+    </Suspense>
   )
 }
