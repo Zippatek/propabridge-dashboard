@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   Bot,
   List,
+  Newspaper,
+  MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -54,6 +56,13 @@ const sections: Array<{
     label: 'Listings',
     items: [
       { icon: List, label: 'All Listings', href: '/admin/listings' },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { icon: Newspaper, label: 'Blogs', href: '/admin/blogs' },
+      { icon: MapPin, label: 'Neighborhoods', href: '/admin/neighborhoods' },
     ],
   },
   {
