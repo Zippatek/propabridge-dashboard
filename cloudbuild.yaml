@@ -20,6 +20,10 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--max-instances'
+      - '20'
+      - '--min-instances'
+      - '0'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/propabridge-dashboard/propabridge-dashboard:$COMMIT_SHA'
