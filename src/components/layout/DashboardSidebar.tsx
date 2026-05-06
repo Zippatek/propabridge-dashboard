@@ -130,7 +130,7 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
       {!isCollapsed && (
         <div className="px-4 pb-4">
           <a
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'}`}
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348055551300'}`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={onMobileClose}

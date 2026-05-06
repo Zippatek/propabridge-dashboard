@@ -23,7 +23,7 @@ interface Lead {
 type Resp = { items?: Lead[]; data?: Lead[] } | Lead[]
 
 const statuses = ['all', 'new', 'contacted', 'viewing_scheduled', 'converted', 'dead']
-const WHATSAPP = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'
+const WHATSAPP = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348055551300'
 
 export default function AgencyLeadsPage() {
   const [items, setItems] = useState<Lead[] | null>(null)

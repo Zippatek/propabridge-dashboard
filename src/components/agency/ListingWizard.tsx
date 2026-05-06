@@ -32,6 +32,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { agency } from '@/lib/agency-api'
+import { PolygonDrawer } from '@/components/agency/PolygonDrawer'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
@@ -479,18 +480,26 @@ export function ListingWizard() {
               <p className="text-caption text-subtle mt-2">JPEG, PNG, or WebP. Max 8 MB each. First photo becomes the cover.</p>
             </div>
 
-            {/* Polygon GeoJSON */}
+            {/* Polygon drawing */}
             <div>
-              <label className="block text-nav font-medium text-navy mb-2">Property boundary (GeoJSON polygon)</label>
+              <label className="block text-nav font-medium text-navy mb-2">Property boundary</label>
+              <PolygonDrawer
+                onPolygonChange={(geojson) => set('polygon_geojson', geojson || '')}
+                initialPolygon={form.polygon_geojson || undefined}
+              />
+            </div>
+
+            {/* Fallback: raw GeoJSON paste */}
+            <details className="group">
+              <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Or paste raw GeoJSON</summary>
               <textarea
                 value={form.polygon_geojson}
                 onChange={(e) => set('polygon_geojson', e.target.value)}
                 placeholder='{"type":"Polygon","coordinates":[[[3.42,7.48],[3.43,7.48],[3.43,7.49],[3.42,7.49],[3.42,7.48]]]}'
                 rows={4}
-                className="w-full px-3 py-2.5 rounded-input border border-divider bg-white text-body-sm font-mono text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
+                className="mt-2 w-full px-3 py-2.5 rounded-input border border-divider bg-white text-body-sm font-mono text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
               />
-              <p className="text-caption text-subtle mt-1">Optional. Paste a GeoJSON polygon for the geospatial cross-check. A map drawing tool is coming soon.</p>
-            </div>
+            </details>
           </div>
         )}
 

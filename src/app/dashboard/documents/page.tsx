@@ -54,7 +54,7 @@ export default function CustomerDocumentsPage() {
         title="No documents yet"
         body="When you book an inspection, the verified report, title docs, and offer letters for that property will land here."
         ctaLabel="Talk to Propa →"
-        ctaHref={`https://wa.me/${process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'}`}
+        ctaHref={`https://wa.me/${process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348055551300'}`}
         illustration="house"
       />
     )

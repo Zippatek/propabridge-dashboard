@@ -8,7 +8,7 @@ import { formatDateTime, statusClass } from '@/lib/format'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { EmptyState } from '@/components/ui'
 
-const WHATSAPP = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'
+const WHATSAPP = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348055551300'
 
 interface Appt {
   id: string

@@ -1,47 +1,70 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ShieldCheck, AlertTriangle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ShieldCheck, Search, Users } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { formatDateTime } from '@/lib/format'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
+import { StatCard } from '@/components/ui/StatCard'
 
-interface KycUser {
+interface User {
   id: string
+  first_name?: string
+  last_name?: string
   name?: string
   email?: string
   phone?: string
-  status?: string
+  role?: string
+  kyc_status?: 'pending' | 'verified' | 'rejected' | null
   document_type?: string
   submitted_at?: string
-  [key: string]: unknown
+  created_at?: string
 }
-type KycResp = { items?: KycUser[]; data?: KycUser[] } | KycUser[]
+
+type AnyResp =
+  | User[]
+  | { items?: User[]; users?: User[]; data?: User[]; count?: number }
+
+type Tab = 'all' | 'pending' | 'verified' | 'rejected'
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'all', label: 'All users' },
+  { value: 'pending', label: 'KYC pending' },
+  { value: 'verified', label: 'KYC verified' },
+  { value: 'rejected', label: 'Rejected' },
+]
 
 export default function AdminUsersPage() {
-  const [items, setItems] = useState<KycUser[] | null>(null)
+  const [users, setUsers] = useState<User[] | null>(null)
+  const [pending, setPending] = useState<User[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('all')
+  const [search, setSearch] = useState('')
 
   const load = async () => {
-    setItems(null)
+    setUsers(null)
+    setPending(null)
     setError(null)
     try {
-      const v = await be.get<KycResp>('/admin/kyc/pending')
-      const list = Array.isArray(v)
-        ? v
-        : (v as { users?: KycUser[]; items?: KycUser[]; data?: KycUser[] }).users ||
-          (v as { items?: KycUser[] }).items ||
-          (v as { data?: KycUser[] }).data ||
-          []
-      setItems(list)
+      // Two endpoints:
+      //   /admin/users         — full list (now exposed)
+      //   /admin/kyc/pending   — sub-view used for the KYC reviewer table
+      // We fetch both so the tabs can switch instantly.
+      const [allResp, pendResp] = await Promise.all([
+        be.get<AnyResp>('/admin/users?limit=500'),
+        be.get<AnyResp>('/admin/kyc/pending'),
+      ])
+      const unwrap = (v: AnyResp): User[] =>
+        Array.isArray(v)
+          ? v
+          : v.users || v.items || v.data || []
+      setUsers(unwrap(allResp))
+      setPending(unwrap(pendResp))
     } catch (e) {
       setError((e as Error).message)
     }
   }
-
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
 
   const review = async (userId: string, decision: 'approved' | 'rejected') => {
     const reason =
@@ -57,26 +80,94 @@ export default function AdminUsersPage() {
     }
   }
 
+  const display = useMemo(() => {
+    if (!users) return null
+    let list: User[]
+    if (tab === 'pending') list = pending || []
+    else if (tab === 'verified') list = users.filter((u) => u.kyc_status === 'verified')
+    else if (tab === 'rejected') list = users.filter((u) => u.kyc_status === 'rejected')
+    else list = users
+    if (!search.trim()) return list
+    const s = search.trim().toLowerCase()
+    return list.filter(
+      (u) =>
+        (u.email || '').toLowerCase().includes(s) ||
+        (u.phone || '').toLowerCase().includes(s) ||
+        ((u.first_name || '') + ' ' + (u.last_name || '') + ' ' + (u.name || ''))
+          .toLowerCase()
+          .includes(s),
+    )
+  }, [users, pending, tab, search])
+
   if (error) return <PageError message={error} />
+  if (!users || display === null) return <PageLoading />
+
+  const totals = {
+    all: users.length,
+    pending: (pending || []).length,
+    verified: users.filter((u) => u.kyc_status === 'verified').length,
+    rejected: users.filter((u) => u.kyc_status === 'rejected').length,
+  }
+
+  const fullName = (u: User) =>
+    u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Unnamed'
+
+  const kycBadge = (s: User['kyc_status']) => {
+    switch (s) {
+      case 'verified': return 'bg-verified-light text-verified'
+      case 'pending': return 'bg-warning-light text-warning'
+      case 'rejected': return 'bg-danger-light text-danger'
+      default: return 'bg-beige text-subtle'
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-divider flex items-center justify-between bg-gold-light/40">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={18} className="text-gold" strokeWidth={1.8} />
-            <h2 className="text-h4 text-navy">KYC Review Queue</h2>
-          </div>
-          <span className="text-caption text-subtle">
-            {items === null ? '—' : `${items.length} pending`}
-          </span>
-        </div>
+      <div>
+        <h1 className="text-h3 text-navy">Users</h1>
+        <p className="text-body-sm text-subtle mt-1">
+          Customer accounts and KYC review.
+        </p>
+      </div>
 
-        {items === null ? (
-          <PageLoading />
-        ) : items.length === 0 ? (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={Users} iconColor="#2563eb" iconBgColor="#dbeafe" value={String(totals.all)} label="Total users" />
+        <StatCard icon={ShieldCheck} iconColor="#f59e0b" iconBgColor="#fffbeb" value={String(totals.pending)} label="KYC pending" />
+        <StatCard icon={ShieldCheck} iconColor="#16a34a" iconBgColor="#dcfce7" value={String(totals.verified)} label="KYC verified" />
+        <StatCard icon={ShieldCheck} iconColor="#dc2626" iconBgColor="#fef2f2" value={String(totals.rejected)} label="Rejected" />
+      </div>
+
+      <div className="flex gap-1 border-b border-divider overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            onClick={() => setTab(t.value)}
+            className={`px-4 py-2.5 text-body-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              tab === t.value
+                ? 'border-action text-navy'
+                : 'border-transparent text-subtle hover:text-navy'
+            }`}
+          >
+            {t.label}
+            <span className="ml-1.5 text-caption text-subtle">({totals[t.value]})</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-placeholder" strokeWidth={1.8} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, email, or phone..."
+          className="w-full pl-8 pr-3 py-2.5 rounded-input border border-divider bg-white text-body-sm text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
+        />
+      </div>
+
+      <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
+        {display.length === 0 ? (
           <div className="p-10 text-center text-body-sm text-subtle">
-            No pending KYC reviews.
+            {search ? 'No users match your search.' : 'No users in this view.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -84,66 +175,52 @@ export default function AdminUsersPage() {
               <thead>
                 <tr className="bg-beige/50 text-caption font-semibold text-subtle uppercase tracking-wider">
                   <th className="px-6 py-3">User</th>
-                  <th className="px-6 py-3">Document</th>
-                  <th className="px-6 py-3">Submitted</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
+                  <th className="px-6 py-3">Role</th>
+                  <th className="px-6 py-3">KYC</th>
+                  <th className="px-6 py-3">Joined</th>
+                  {tab === 'pending' && <th className="px-6 py-3 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-divider">
-                {items.map((u) => (
+                {display.map((u) => (
                   <tr key={u.id} className="hover:bg-beige/30">
                     <td className="px-6 py-4">
-                      <p className="font-semibold text-navy">{u.name || 'Unnamed'}</p>
-                      <p className="text-caption text-subtle">
-                        {u.email || u.phone || '—'}
-                      </p>
+                      <p className="font-semibold text-navy">{fullName(u)}</p>
+                      <p className="text-caption text-subtle">{u.email || u.phone || '—'}</p>
                     </td>
-                    <td className="px-6 py-4 text-body-sm">
-                      {u.document_type || '—'}
+                    <td className="px-6 py-4 text-body-sm text-navy capitalize">{u.role || '—'}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-caption font-semibold ${kycBadge(u.kyc_status)}`}>
+                        {u.kyc_status || 'none'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-caption text-subtle">
-                      {formatDateTime(u.submitted_at)}
+                      {formatDateTime(u.created_at || u.submitted_at)}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="inline-flex gap-2">
-                        <button
-                          onClick={() => review(u.id, 'approved')}
-                          className="text-body-sm font-semibold text-verified bg-verified-light px-3 py-1.5 rounded-button"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => review(u.id, 'rejected')}
-                          className="text-body-sm font-semibold text-danger bg-danger-light px-3 py-1.5 rounded-button"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </td>
+                    {tab === 'pending' && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="inline-flex gap-2">
+                          <button
+                            onClick={() => review(u.id, 'approved')}
+                            className="text-body-sm font-semibold text-verified bg-verified-light px-3 py-1.5 rounded-button"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => review(u.id, 'rejected')}
+                            className="text-body-sm font-semibold text-danger bg-danger-light px-3 py-1.5 rounded-button"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </section>
-
-      <section className="bg-white rounded-card border border-divider shadow-card p-6 text-body-sm text-subtle flex gap-3 items-start">
-        <AlertTriangle size={18} className="text-gold mt-0.5 flex-shrink-0" strokeWidth={1.8} />
-        <div>
-          <p className="font-semibold text-navy">Listing all users</p>
-          <p className="mt-1">
-            The propabridge-backend api-gateway does not currently expose a
-            <code className="bg-beige px-1.5 py-0.5 rounded mx-1 text-navy font-mono text-caption">
-              GET /admin/users
-            </code>
-            endpoint. To list / search every registered user, add that route to
-            <code className="bg-beige px-1.5 py-0.5 rounded mx-1 text-navy font-mono text-caption">
-              api-gateway/src/routes/admin.js
-            </code>
-            and this page will pick it up automatically.
-          </p>
-        </div>
       </section>
     </div>
   )

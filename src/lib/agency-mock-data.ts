@@ -160,7 +160,7 @@ export const MOCK_COMMISSIONS = {
 export const MOCK_PROFILE = {
   name: 'Zippatek Real Estate Agency',
   email: 'partnerships@zippatek.com',
-  phone: '+234 800 000 0000',
+  phone: '+234 805 555 1300',
   address: '123 Gwarinpa Estate, Abuja',
   commission_rate: 0.05,
   payout_bank: 'Access Bank',

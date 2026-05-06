@@ -29,7 +29,7 @@ interface DealAppointment {
   property_address?: string
 }
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348055551300'
 
 /**
  * "My Deal" — the customer Deal Room.

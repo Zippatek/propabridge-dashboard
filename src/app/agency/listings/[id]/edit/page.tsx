@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Upload, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Upload, Trash2, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { agency } from '@/lib/agency-api'
 import { formatNaira } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
@@ -22,7 +22,10 @@ interface Listing {
   amenities?: string[]
   city?: string
   neighbourhood?: string
+  verification_status?: 'draft' | 'submitted' | 'in_review' | 'verified' | 'rejected' | 'needs_info'
 }
+
+const COSMETIC_FIELDS = new Set(['description', 'images', 'amenities', 'status'])
 
 export default function EditListingPage() {
   const params = useParams()
@@ -70,8 +73,35 @@ export default function EditListingPage() {
       .catch((e) => setError((e as Error).message))
   }, [id])
 
+  // What the user is about to change vs what's saved. Used to (a) decide
+  // whether to surface the verification-reset warning, and (b) skip sending
+  // unchanged fields to the backend.
+  const diffMaterial = (): boolean => {
+    if (!listing) return false
+    const changed: Record<string, boolean> = {
+      title: form.title !== (listing.title || ''),
+      price: form.price !== (listing.price != null ? String(listing.price) : ''),
+      location: form.location !== (listing.location || ''),
+      bedrooms: form.bedrooms !== (listing.bedrooms != null ? String(listing.bedrooms) : ''),
+      bathrooms: form.bathrooms !== (listing.bathrooms != null ? String(listing.bathrooms) : ''),
+    }
+    return Object.entries(changed).some(([k, v]) => v && !COSMETIC_FIELDS.has(k))
+  }
+
+  const willResetVerification = listing?.verification_status === 'verified' && diffMaterial()
+
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (willResetVerification) {
+      const ok = confirm(
+        'This listing is currently Verified. The fields you changed will return ' +
+          'it to the verification queue and our team will re-review it before it ' +
+          'goes back live to buyers.\n\nProceed?',
+      )
+      if (!ok) return
+    }
+
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -89,8 +119,12 @@ export default function EditListingPage() {
           ? form.amenities.split(',').map((s) => s.trim()).filter(Boolean)
           : undefined,
       }
-      await agency.send(`/listings/${encodeURIComponent(id)}`, 'PATCH', body)
+      const resp = await agency.send<{
+        listing: Listing
+        verification_reset?: boolean
+      }>(`/listings/${encodeURIComponent(id)}`, 'PATCH', body)
       setSaved(true)
+      if (resp?.listing) setListing(resp.listing)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -117,6 +151,39 @@ export default function EditListingPage() {
           </p>
         </div>
       </div>
+
+      {/* Verification banner — Verified listings get a clear contract:
+          editing material fields drops them back into the queue. */}
+      {listing.verification_status === 'verified' && (
+        <div className="flex items-start gap-3 p-4 rounded-card bg-verified-light/40 border border-verified/20">
+          <ShieldCheck size={20} className="text-verified flex-shrink-0 mt-0.5" />
+          <div className="text-body-sm">
+            <p className="font-semibold text-navy">This listing is verified.</p>
+            <p className="text-subtle mt-1">
+              Cosmetic edits (description, photos, amenities) keep the badge.
+              Changing the title, price, location, or bedroom count returns it
+              to the verification queue for re-review.
+            </p>
+          </div>
+        </div>
+      )}
+      {willResetVerification && (
+        <div className="flex items-start gap-3 p-4 rounded-card bg-warning-light/50 border border-warning/30">
+          <AlertTriangle size={20} className="text-warning flex-shrink-0 mt-0.5" />
+          <p className="text-body-sm text-navy">
+            Saving these changes will move this listing back to <strong>Submitted</strong>.
+          </p>
+        </div>
+      )}
+      {saved && (
+        <div className="flex items-start gap-3 p-4 rounded-card bg-verified-light/40 border border-verified/20">
+          <ShieldCheck size={20} className="text-verified flex-shrink-0 mt-0.5" />
+          <p className="text-body-sm text-navy">
+            Saved.
+            {listing.verification_status !== 'verified' && ' Reviewer will pick it up.'}
+          </p>
+        </div>
+      )}
 
       <form onSubmit={onSave} className="bg-white rounded-card border border-divider shadow-card p-6 sm:p-8 space-y-5">
         <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />

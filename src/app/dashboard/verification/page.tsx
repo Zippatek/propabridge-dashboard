@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { ShieldCheck, CheckCircle2, Clock, AlertCircle, Upload } from 'lucide-react'
 import { customer } from '@/lib/customer-api'
 
-const WHATSAPP = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348000000000'
+const WHATSAPP = process.env.NEXT_PUBLIC_PROPA_WHATSAPP_NUMBER || '2348055551300'
 
 export default function VerificationPage() {
   const { data: session } = useSession()
