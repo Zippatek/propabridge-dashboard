@@ -47,14 +47,14 @@ export default function AgencyOverviewPage() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-card animate-fade-up gradient-navy-radial p-8 lg:p-10 text-white">
+      <section className="relative overflow-hidden rounded-card animate-fade-up gradient-navy-radial p-8 lg:p-10 text-on-dark-primary">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="max-w-lg">
             <p className="badge-text text-gold uppercase tracking-wide">Agency Portal</p>
-            <h2 className="text-[28px] lg:text-[32px] font-bold mt-2 leading-tight">
+            <h2 className="text-[28px] lg:text-[32px] font-bold mt-2 leading-tight text-on-dark-primary">
               Welcome back to your dashboard.
             </h2>
-            <p className="text-white/75 mt-3">
+            <p className="text-on-dark-secondary mt-3">
               {data.leads_new} new lead{data.leads_new === 1 ? '' : 's'} ·{' '}
               {data.inspections_upcoming} upcoming viewing
               {data.inspections_upcoming === 1 ? '' : 's'} ·{' '}

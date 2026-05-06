@@ -74,7 +74,7 @@ export function AgencyWelcomePanel() {
                             onClick={() => choose('en')}
                             aria-pressed={lang === 'en'}
                             className={`px-3 py-1 rounded-full transition ${
-                                lang === 'en' ? 'bg-white text-navy-900 font-semibold' : 'text-white/70 hover:text-white'
+                                lang === 'en' ? 'bg-white text-navy-900 font-semibold' : 'text-on-dark-muted hover:text-white'
                             }`}
                         >
                             EN
@@ -84,7 +84,7 @@ export function AgencyWelcomePanel() {
                             onClick={() => choose('ha')}
                             aria-pressed={lang === 'ha'}
                             className={`px-3 py-1 rounded-full transition ${
-                                lang === 'ha' ? 'bg-white text-navy-900 font-semibold' : 'text-white/70 hover:text-white'
+                                lang === 'ha' ? 'bg-white text-navy-900 font-semibold' : 'text-on-dark-muted hover:text-white'
                             }`}
                         >
                             HA
@@ -96,7 +96,7 @@ export function AgencyWelcomePanel() {
                     <h1 className="text-[36px] font-bold leading-tight tracking-tight text-white">
                         {t.headline}
                     </h1>
-                    <p className="mt-4 text-[16px] text-white/75 leading-relaxed">
+                    <p className="mt-4 text-[16px] text-on-dark-secondary leading-relaxed">
                         {t.sub}
                     </p>
 

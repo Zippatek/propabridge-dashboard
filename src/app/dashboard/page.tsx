@@ -94,10 +94,10 @@ export default function DashboardPage() {
                 Verified Properties Only
               </div>
             </div>
-            <h2 className="text-[32px] lg:text-[36px] font-bold text-white leading-[1.15] tracking-tight">
+            <h2 className="text-[32px] lg:text-[36px] font-bold text-on-dark-primary leading-[1.15] tracking-tight">
               Welcome back, {firstName}.
             </h2>
-            <p className="text-[16px] text-white/75 mt-3 leading-relaxed">
+            <p className="text-[16px] text-on-dark-secondary mt-3 leading-relaxed">
               Propa is on WhatsApp. Continue your conversation, browse new matches, or
               book another viewing — all in one chat.
             </p>

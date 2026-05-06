@@ -24,7 +24,7 @@ export default function AdminLoginPage() {
             <h1 className="text-[36px] font-bold leading-tight tracking-tight text-white">
               The control room for Propabridge.
             </h1>
-            <p className="mt-4 text-[16px] text-white/75 leading-relaxed">
+            <p className="mt-4 text-[16px] text-on-dark-secondary leading-relaxed">
               Monitor user inquiries, inspections, AI conversations, and lead pipelines —
               all in one place.
             </p>

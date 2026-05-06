@@ -303,6 +303,19 @@
     background-clip: text;
   }
 
+  /* Dark-surface text utilities for stronger readability */
+  .text-on-dark-primary {
+    color: rgba(255, 255, 255, 0.98);
+  }
+
+  .text-on-dark-secondary {
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .text-on-dark-muted {
+    color: rgba(255, 255, 255, 0.84);
+  }
+
   /* ─── ENHANCED CARD EFFECTS ──────────────────────────────── */
 
   .card-hover {

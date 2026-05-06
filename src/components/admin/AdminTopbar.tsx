@@ -6,10 +6,15 @@ import { Menu, RefreshCw } from 'lucide-react'
 const titles: Record<string, string> = {
   '/admin': 'Overview',
   '/admin/users': 'Users',
+  '/admin/agencies': 'Agencies',
+  '/admin/listings': 'Listings',
   '/admin/inquiries': 'Inquiries',
   '/admin/inspections': 'Inspections',
   '/admin/conversations': 'Conversations',
   '/admin/leads': 'Leads',
+  '/admin/verifications': 'Verifications',
+  '/admin/promises': 'AI Promises & Escalations',
+  '/admin/ai-agents': 'AI Agents',
   '/admin/templates': 'WhatsApp Templates',
   '/admin/settings': 'Settings',
 }
