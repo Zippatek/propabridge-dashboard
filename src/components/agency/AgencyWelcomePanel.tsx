@@ -93,7 +93,7 @@ export function AgencyWelcomePanel() {
                 </div>
 
                 <div className="max-w-[480px]">
-                    <h1 className="text-[36px] font-bold leading-tight tracking-tight">
+                    <h1 className="text-[36px] font-bold leading-tight tracking-tight text-white">
                         {t.headline}
                     </h1>
                     <p className="mt-4 text-[16px] text-white/75 leading-relaxed">
