@@ -21,7 +21,6 @@ interface Doc {
 export default function CustomerDocumentsPage() {
   const { data: session } = useSession()
   const [docs, setDocs] = useState<Doc[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!session?.user?.id) return
@@ -30,21 +29,12 @@ export default function CustomerDocumentsPage() {
         `/api/documents?user_id=${session.user.id}`,
       )
       .then((v) => setDocs(Array.isArray(v) ? v : v.items || v.data || []))
-      .catch((e) => setError((e as Error).message))
+      .catch(() => {
+        // Endpoint not live yet (or zero docs) — fall through to the empty state.
+        // Never show a scary error to a customer who just hasn't started a deal.
+        setDocs([])
+      })
   }, [session?.user?.id])
-
-  if (error) {
-    return (
-      <div className="bg-warning-light border border-warning/20 rounded-card p-6 text-warning">
-        <p className="font-semibold">Documents not yet available</p>
-        <p className="text-body-sm mt-1">
-          The <code className="font-mono">/api/documents</code> endpoint isn&apos;t live yet.
-          Once you have an active deal, your inspection report, title verification, and
-          offer letter will appear here.
-        </p>
-      </div>
-    )
-  }
 
   if (docs === null) return <LoadingSpinner size="lg" />
 
