@@ -131,3 +131,52 @@ export interface BackendListing {
   created_at?: string
   [key: string]: unknown
 }
+
+export interface AdkListing {
+  id: string
+  title?: string
+  description?: string
+  city?: string
+  bedrooms?: number
+  bathrooms?: number
+  price?: number
+  listing_type?: string
+  property_type?: string
+  size_sqm?: number
+  cover_image_url?: string
+  slug?: string
+  featured?: boolean
+  year_built?: string
+  created_at?: string
+  updated_at?: string
+  previous_price?: number
+  [key: string]: unknown
+}
+
+export interface AdkPromise {
+  id: string
+  created_at: string
+  session_id: string
+  lead_phone?: string | null
+  lead_name?: string | null
+  promise_text: string
+  detected_keywords?: string[]
+  is_explicit?: boolean
+  status: 'open' | 'resolved'
+  resolved_at?: string | null
+  resolved_by?: string | null
+  notes?: string | null
+}
+
+export interface AdkAgent {
+  id: string
+  name: string
+  description: string
+  category: string
+  status: 'active' | 'paused' | 'error'
+  schedule?: string | null
+  last_run?: string | null
+  last_result?: string | null
+  tools_used?: string[]
+  icon?: string
+}

@@ -19,6 +19,9 @@ import {
   ShieldCheck,
   Building2,
   ClipboardCheck,
+  AlertTriangle,
+  Bot,
+  List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +45,15 @@ const sections: Array<{
     items: [
       { icon: MessageSquare, label: 'Conversations', href: '/admin/conversations' },
       { icon: Flame, label: 'Leads', href: '/admin/leads' },
+      { icon: AlertTriangle, label: 'Promises / Escalations', href: '/admin/promises' },
+      { icon: Bot, label: 'AI Agents', href: '/admin/ai-agents' },
       { icon: LayoutTemplate, label: 'WhatsApp Templates', href: '/admin/templates' },
+    ],
+  },
+  {
+    label: 'Listings',
+    items: [
+      { icon: List, label: 'All Listings', href: '/admin/listings' },
     ],
   },
   {
