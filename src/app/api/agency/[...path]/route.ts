@@ -59,10 +59,18 @@ async function handle(
   const headers = new Headers({ 'x-agency-token': token })
   let body: BodyInit | undefined
   if (method !== 'GET' && method !== 'DELETE') {
-    const text = await req.text()
-    if (text) {
-      body = text
-      headers.set('content-type', req.headers.get('content-type') || 'application/json')
+    const reqContentType = req.headers.get('content-type') || ''
+    if (reqContentType.startsWith('multipart/form-data')) {
+      // Stream binary through unchanged so the multipart boundary survives.
+      // Using req.text() here would corrupt the upload payload.
+      body = await req.arrayBuffer()
+      headers.set('content-type', reqContentType)
+    } else {
+      const text = await req.text()
+      if (text) {
+        body = text
+        headers.set('content-type', reqContentType || 'application/json')
+      }
     }
   }
 

@@ -63,7 +63,7 @@ const POWER_OPTS = ['', 'grid', 'grid_inverter', 'solar', 'generator_only', 'non
 const WATER_OPTS = ['', 'mains', 'borehole', 'none']
 const SEWAGE_OPTS = ['', 'mains', 'septic', 'soakaway']
 const ROAD_OPTS = ['', 'tarred', 'graded', 'untarred', 'seasonal']
-const CONSTRUCTION_OPTS = ['', 'bare_land', 'excavation', 'foundation', 'walling', 'roofing', 'finishing', 'completed']
+const CONSTRUCTION_OPTS = ['', 'finished', 'semi_finished', 'under_construction', 'off_plan', 'plots']
 const CONDITION_OPTS = ['', 'new', 'renovated', 'existing']
 const INTENT_OPTS = [
   ['for_sale', 'For sale'],
@@ -222,7 +222,7 @@ const EMPTY_ANSWERS: AiListingAnswers = {
   water_supply: 'borehole',
   sewage: 'septic',
   road_access: 'tarred',
-  construction_status: 'completed',
+  construction_status: 'finished',
   condition: '',
   is_estate_unit: false,
   estate_name: '',

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Edit, Building2, MapPin, BedDouble } from 'lucide-react'
+import { Plus, Edit, Building2, MapPin, BedDouble, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui'
 import { agency } from '@/lib/agency-api'
 import { formatNaira } from '@/lib/format'
@@ -37,6 +37,16 @@ export default function AgencyListingsPage() {
       .then((v) => setItems(Array.isArray(v) ? v : v.items || v.data || []))
       .catch((e) => setError((e as Error).message))
   }, [])
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this listing? This cannot be undone.')) return
+    try {
+      await agency.send(`/listings/${id}`, 'DELETE', undefined)
+      setItems((prev) => (prev ?? []).filter((l) => l.id !== id))
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
 
   if (error)
     return (
@@ -172,13 +182,22 @@ export default function AgencyListingsPage() {
                   <div className="text-caption text-subtle">
                     {l.views ?? 0} views · {l.leads ?? 0} leads
                   </div>
-                  <Link
-                    href={`/agency/listings/${l.id}/edit`}
-                    className="text-body-sm font-semibold text-action hover:text-action-hover flex items-center gap-1"
-                  >
-                    <Edit size={12} strokeWidth={2} />
-                    Edit
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/agency/listings/${l.id}/edit`}
+                      className="text-body-sm font-semibold text-action hover:text-action-hover flex items-center gap-1"
+                    >
+                      <Edit size={12} strokeWidth={2} />
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(l.id)}
+                      title="Delete listing"
+                      className="text-body-sm font-semibold text-subtle hover:text-danger flex items-center gap-1"
+                    >
+                      <Trash2 size={12} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

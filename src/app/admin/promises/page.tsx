@@ -50,7 +50,7 @@ export default function AdminPromisesPage() {
   const resolve = async (id: string) => {
     setResolvingId(id)
     try {
-      await adk.send(`/promises/${id}/resolve`, 'POST', { resolved_by: 'admin' })
+      await adk.send(`/promises/${id}/resolve`, 'PATCH', { resolved_by: 'admin' })
       load()
     } catch (e) {
       alert((e as Error).message)
