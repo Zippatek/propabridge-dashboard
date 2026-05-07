@@ -33,6 +33,14 @@ async function handle(
     return NextResponse.json(data)
   } catch (e) {
     const err = e as ApiError
+    // When the backend returns an HTML page (Express default for unimplemented routes),
+    // serve an empty collection rather than leaking raw HTML to the client.
+    if (method === 'GET' && err.status === 404) {
+      const msg = err.message ?? ''
+      if (msg.includes('Cannot GET') || msg.trimStart().startsWith('<')) {
+        return NextResponse.json({ items: [], data: [], neighborhoods: [], total: 0 })
+      }
+    }
     return NextResponse.json(
       { error: err.message || 'Upstream error' },
       { status: err.status || 500 },

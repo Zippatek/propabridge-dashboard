@@ -17,6 +17,7 @@ const BACKEND_BASE =
   process.env.PROPA_BACKEND_BASE || 'https://propabridge-api-gateway-480235407496.us-central1.run.app'
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',

@@ -13,9 +13,12 @@ import {
   ExternalLink,
   ChevronDown,
   Home,
+  Plus,
+  Sparkles,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
+import AddListingDrawer from '@/components/admin/AddListingDrawer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -307,6 +310,7 @@ export default function AdminListingsPage() {
   const [statusFilter, setStatus]   = useState('all')
   const [editTarget, setEditTarget] = useState<Listing | null>(null)
   const [togglingId, setToggling]   = useState<string | null>(null)
+  const [showAdd, setShowAdd]       = useState(false)
 
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -315,8 +319,33 @@ export default function AdminListingsPage() {
     const params = new URLSearchParams({ limit: '50' })
     if (q)                   params.set('q', q)
     if (status !== 'all')    params.set('status', status)
-    be.get<{ items: Listing[]; total: number }>(`/listings?${params}`)
-      .then(d => { setListings(d.items || []); setTotal(d.total || 0) })
+    be.get<Record<string, unknown>>(`/listings?${params}`)
+      .then(d => {
+        // Backend returns { success, count, data[] } — normalize to expected shape
+        const raw = ((d.items || d.data || []) as Record<string, unknown>[])
+        const items: Listing[] = raw.map(item => ({
+          id:                  String(item.id ?? ''),
+          title:               item.title               as string | undefined,
+          slug:                item.slug                as string | undefined,
+          city:                item.city                as string | undefined,
+          listing_type:        (item.listing_type || item.transaction_type) as string | undefined,
+          property_type:       (item.property_type || item.type)            as string | undefined,
+          bedrooms:            item.bedrooms  as number | null | undefined,
+          bathrooms:           item.bathrooms as number | null | undefined,
+          size_sqm:            item.size_sqm  as number | null | undefined,
+          price:               item.price     as number | null | undefined,
+          previous_price:      item.previous_price as number | null | undefined,
+          cover_image_url:     (item.cover_image_url || (Array.isArray(item.images) ? item.images[0] : null)) as string | null | undefined,
+          featured:            item.featured as boolean | undefined,
+          verification_status: (item.verification_status || (item.verified ? 'verified' : 'draft')) as string | undefined,
+          agency_name:         (item.agency_name || item.agent)  as string | undefined,
+          agency_id:           item.agency_id as string | undefined,
+          created_at:          item.created_at as string | undefined,
+          updated_at:          item.updated_at as string | undefined,
+        }))
+        setListings(items)
+        setTotal((d.total as number) || (d.count as number) || 0)
+      })
       .catch(e => setError((e as Error).message))
   }, [])
 
@@ -364,6 +393,14 @@ export default function AdminListingsPage() {
         />
       )}
 
+      {/* Add listing drawer */}
+      {showAdd && (
+        <AddListingDrawer
+          onClose={() => setShowAdd(false)}
+          onCreated={() => { setShowAdd(false); load(search, statusFilter) }}
+        />
+      )}
+
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -373,6 +410,14 @@ export default function AdminListingsPage() {
               {listings === null ? '…' : `${total} properties`} in the database
             </p>
           </div>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-action hover:bg-action-hover text-white text-body-sm font-semibold rounded-button transition-all duration-150 shadow-sm"
+          >
+            <Plus size={15} strokeWidth={2.5} />
+            <Sparkles size={13} strokeWidth={2} className="opacity-80" />
+            Add listing
+          </button>
         </div>
 
         {/* Search + filter bar */}

@@ -31,6 +31,11 @@ async function handle(
     if (path === 'inspections') return mock.MOCK_INSPECTIONS
     if (path === 'commissions') return mock.MOCK_COMMISSIONS
     if (path === 'profile') return mock.MOCK_PROFILE
+    // Sub-resource paths (e.g. listings/{id} for the edit page)
+    if (path.startsWith('listings/')) {
+      const id = path.split('/')[1]
+      return mock.MOCK_LISTINGS.items.find((l) => l.id === id) ?? mock.MOCK_LISTINGS.items[0] ?? null
+    }
     return null
   }
 
@@ -74,7 +79,7 @@ async function handle(
     if (!upstream.ok) {
       // If backend fails but we have mock data, use it in dev mode
       const mockFallback = getMockData()
-      if (mockFallback && (isDev || upstream.status === 404)) {
+      if (mockFallback && (isDev || upstream.status === 404 || upstream.status >= 500)) {
         return NextResponse.json(mockFallback)
       }
 
