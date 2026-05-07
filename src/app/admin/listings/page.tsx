@@ -673,6 +673,13 @@ export default function AdminListingsPage() {
   const [togglingId, setToggling]   = useState<string | null>(null)
   const [showAdd, setShowAdd]       = useState(false)
 
+  const [bucketOrphans, setBucketOrphans] = useState<
+    { url: string; path: string; agency_id?: string }[] | null
+  >(null)
+  const [bucketOrphansBusy, setBucketOrphansBusy] = useState(false)
+  const [bucketOrphansErr, setBucketOrphansErr] = useState<string | null>(null)
+  const [attachPidByPath, setAttachPidByPath] = useState<Record<string, string>>({})
+
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback((q: string, status: string) => {
@@ -846,6 +853,100 @@ export default function AdminListingsPage() {
             <Sparkles size={13} strokeWidth={2} className="opacity-80" />
             Add listing
           </button>
+        </div>
+
+        {/* Orphan bucket images (GCS agency-listings/…) */}
+        <div className="rounded-card border border-divider bg-white p-4 shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-body-sm font-semibold text-navy flex items-center gap-2">
+                <Upload size={16} className="text-subtle" aria-hidden />
+                Orphan bucket images
+              </h2>
+              <p className="text-caption text-subtle mt-0.5">
+                Objects under{' '}
+                <code className="text-[11px] bg-beige px-1 rounded">agency-listings/&lt;agency_id&gt;/…</code>{' '}
+                not referenced on any property row.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setBucketOrphansErr(null)
+                setBucketOrphansBusy(true)
+                be.get<{ orphans?: { url: string; path: string; agency_id?: string }[] }>(
+                  '/admin/orphan-bucket-images?max=500',
+                )
+                  .then((d) => setBucketOrphans(d.orphans ?? []))
+                  .catch((e) => setBucketOrphansErr((e as Error).message))
+                  .finally(() => setBucketOrphansBusy(false))
+              }}
+              disabled={bucketOrphansBusy}
+              className="flex items-center gap-2 px-3 py-2 rounded-button border border-divider text-caption font-semibold text-navy hover:bg-beige disabled:opacity-50"
+            >
+              {bucketOrphansBusy ? (
+                <Loader2 size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <Upload size={14} aria-hidden />
+              )}
+              Scan bucket
+            </button>
+          </div>
+          {bucketOrphansErr && (
+            <p className="text-caption text-danger mt-2">{bucketOrphansErr}</p>
+          )}
+          {bucketOrphans !== null && bucketOrphans.length === 0 && !bucketOrphansBusy && (
+            <p className="text-caption text-subtle mt-3">No orphans found (within scan limit).</p>
+          )}
+          {bucketOrphans !== null && bucketOrphans.length > 0 && (
+            <ul className="mt-3 divide-y divide-divider max-h-72 overflow-y-auto">
+              {bucketOrphans.map((o) => (
+                <li key={o.path} className="py-3 flex flex-wrap items-center gap-3">
+                  <a
+                    href={o.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-caption text-action hover:underline truncate max-w-[200px]"
+                  >
+                    {o.path}
+                  </a>
+                  {o.agency_id != null && (
+                    <span className="text-caption text-subtle whitespace-nowrap">
+                      agency {o.agency_id}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    placeholder="Property id (row id or PB-…)"
+                    value={attachPidByPath[o.path] ?? ''}
+                    onChange={(e) =>
+                      setAttachPidByPath((prev) => ({ ...prev, [o.path]: e.target.value }))
+                    }
+                    className="flex-1 min-w-[160px] px-2 py-1.5 rounded-input border border-divider text-caption"
+                  />
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 rounded-button bg-action text-white text-caption font-semibold hover:bg-action-hover"
+                    onClick={async () => {
+                      const pid = attachPidByPath[o.path]?.trim()
+                      if (!pid) return
+                      try {
+                        await be.send('/admin/orphan-bucket-images/attach', 'POST', {
+                          path: o.path,
+                          propertyId: pid,
+                        })
+                        setBucketOrphans((prev) => prev?.filter((x) => x.path !== o.path) ?? null)
+                      } catch (e) {
+                        alert((e as Error).message)
+                      }
+                    }}
+                  >
+                    Attach
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Search + filter bar */}
