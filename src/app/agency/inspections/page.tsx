@@ -31,7 +31,8 @@ export default function AgencyInspectionsPage() {
     property_title: '',
     buyer_name: '',
     buyer_phone: '',
-    scheduled_at: '',
+    scheduleDate: '',
+    scheduleTime: '10:00',
     notes: '',
   })
 
@@ -52,10 +53,19 @@ export default function AgencyInspectionsPage() {
         property_title: form.property_title || undefined,
         buyer_name: form.buyer_name,
         buyer_phone: form.buyer_phone,
-        scheduled_at: form.scheduled_at,
+        date: form.scheduleDate,
+        time: form.scheduleTime,
         notes: form.notes || undefined,
       })
-      setForm({ listing_id: '', property_title: '', buyer_name: '', buyer_phone: '', scheduled_at: '', notes: '' })
+      setForm({
+        listing_id: '',
+        property_title: '',
+        buyer_name: '',
+        buyer_phone: '',
+        scheduleDate: '',
+        scheduleTime: '10:00',
+        notes: '',
+      })
       setShowForm(false)
       reload()
     } catch (err) {
@@ -76,9 +86,7 @@ export default function AgencyInspectionsPage() {
 
   if (error)
     return (
-      <PageError
-        message={`${error} — backend /agency/inspections not yet wired (see DASHBOARDS_README).`}
-      />
+      <PageError message={error} />
     )
   if (items === null) return <PageLoading />
 
@@ -155,13 +163,23 @@ export default function AgencyInspectionsPage() {
               className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
             />
           </label>
-          <label className="text-body-sm text-navy md:col-span-2">
-            Scheduled date &amp; time
+          <label className="text-body-sm text-navy">
+            Date
             <input
               required
-              type="datetime-local"
-              value={form.scheduled_at}
-              onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+              type="date"
+              value={form.scheduleDate}
+              onChange={(e) => setForm({ ...form, scheduleDate: e.target.value })}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <label className="text-body-sm text-navy">
+            Time
+            <input
+              required
+              type="time"
+              value={form.scheduleTime}
+              onChange={(e) => setForm({ ...form, scheduleTime: e.target.value })}
               className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
             />
           </label>
@@ -185,20 +203,6 @@ export default function AgencyInspectionsPage() {
           </div>
         </form>
       )}
-
-      <div className="hidden">
-        {(['upcoming', 'past', 'all'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setScope(s)}
-            className={`px-4 py-2 rounded-button text-body-sm font-semibold capitalize transition-colors ${
-              scope === s ? 'bg-action text-white' : 'text-subtle hover:bg-beige'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
 
       <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
         {filtered.length === 0 ? (
@@ -233,17 +237,15 @@ export default function AgencyInspectionsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <select
-                        value={a.status || 'scheduled'}
+                        value={a.status || 'pending'}
                         onChange={(e) => updateStatus(a.id, e.target.value)}
                         className={`px-2 py-1 rounded text-caption font-semibold border-0 focus:outline-none focus:ring-2 focus:ring-action ${statusClass(a.status)}`}
                       >
-                        {['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show'].map(
-                          (s) => (
-                            <option key={s} value={s}>
-                              {s.replace(/_/g, ' ')}
-                            </option>
-                          ),
-                        )}
+                        {['pending', 'confirmed', 'completed', 'cancelled', 'no_show'].map((s) => (
+                          <option key={s} value={s}>
+                            {s.replace(/_/g, ' ')}
+                          </option>
+                        ))}
                       </select>
                     </td>
                   </tr>
