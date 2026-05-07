@@ -610,7 +610,14 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
       await be.send('/listings', 'POST', payload)
       onCreated()
     } catch (e) {
-      setSaveError((e as Error).message)
+      const raw = (e as Error).message
+      // POST /listings requires a user-session JWT that the admin token doesn't provide.
+      // Surface a human-readable explanation rather than the raw backend error.
+      setSaveError(
+        raw.includes("req.user") || raw.includes("'uid'")
+          ? "The backend doesn't support direct admin listing creation yet. Please create this listing through the agency portal, then it will appear here automatically."
+          : raw,
+      )
     } finally {
       setSaving(false)
     }
