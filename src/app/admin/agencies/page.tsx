@@ -262,7 +262,7 @@ export default function AdminAgenciesPage() {
                         </div>
                         <div>
                           <p className="font-semibold text-navy text-body-sm">{a.name}</p>
-                          <p className="text-caption text-subtle">{a.id.substring(0, 8)}…</p>
+                          <p className="text-caption text-subtle">{String(a.id ?? '').substring(0, 8)}…</p>
                         </div>
                       </div>
                     </td>

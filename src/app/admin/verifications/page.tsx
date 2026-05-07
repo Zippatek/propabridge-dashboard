@@ -401,7 +401,7 @@ export default function AdminVerificationsPage() {
                   <tr key={v.listing_id} className="hover:bg-beige/30 transition-colors cursor-pointer" onClick={() => loadDetail(v.listing_id)}>
                     <td className="px-6 py-4">
                       <p className="font-semibold text-navy text-body-sm">{v.title}</p>
-                      <p className="text-caption text-subtle">{v.listing_id.substring(0, 8)}…</p>
+                      <p className="text-caption text-subtle">{String(v.listing_id ?? '').substring(0, 8)}…</p>
                     </td>
                     <td className="px-6 py-4 text-body-sm text-navy">{v.agency_name || '—'}</td>
                     <td className="px-6 py-4 text-body-sm text-navy">{v.city || '—'}</td>

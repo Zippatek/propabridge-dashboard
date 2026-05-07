@@ -179,7 +179,7 @@ function ConversationsView() {
                   </div>
                   <div className="flex items-center justify-between mt-2 gap-2">
                     <span className="text-caption text-subtle bg-beige px-1.5 py-0.5 rounded truncate">
-                      {s.id.substring(0, 12)}…
+                      {String(s.id ?? '').substring(0, 12)}…
                     </span>
                     <span
                       className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreClass(s.score)}`}

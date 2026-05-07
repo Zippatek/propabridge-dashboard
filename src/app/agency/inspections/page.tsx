@@ -24,13 +24,46 @@ export default function AgencyInspectionsPage() {
   const [items, setItems] = useState<Appt[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [scope, setScope] = useState<'upcoming' | 'past' | 'all'>('upcoming')
+  const [showForm, setShowForm] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({
+    listing_id: '',
+    property_title: '',
+    buyer_name: '',
+    buyer_phone: '',
+    scheduled_at: '',
+    notes: '',
+  })
 
-  useEffect(() => {
+  const reload = () =>
     agency
       .get<Resp>('/inspections?limit=500')
       .then((v) => setItems(Array.isArray(v) ? v : v.items || v.data || []))
       .catch((e) => setError((e as Error).message))
-  }, [])
+
+  useEffect(() => { reload() }, [])
+
+  const createAppt = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreating(true)
+    try {
+      await agency.send('/inspections', 'POST', {
+        listing_id: form.listing_id,
+        property_title: form.property_title || undefined,
+        buyer_name: form.buyer_name,
+        buyer_phone: form.buyer_phone,
+        scheduled_at: form.scheduled_at,
+        notes: form.notes || undefined,
+      })
+      setForm({ listing_id: '', property_title: '', buyer_name: '', buyer_phone: '', scheduled_at: '', notes: '' })
+      setShowForm(false)
+      reload()
+    } catch (err) {
+      alert((err as Error).message)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const updateStatus = async (id: string, next: string) => {
     try {
@@ -60,7 +93,100 @@ export default function AgencyInspectionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-card border border-divider shadow-card p-1 inline-flex">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-white rounded-card border border-divider shadow-card p-1 inline-flex">
+          {(['upcoming', 'past', 'all'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setScope(s)}
+              className={`px-4 py-2 rounded-button text-body-sm font-semibold capitalize transition-colors ${
+                scope === s ? 'bg-action text-white' : 'text-subtle hover:bg-beige'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="px-4 py-2 rounded-button bg-action text-white text-body-sm font-semibold hover:opacity-90"
+        >
+          {showForm ? 'Cancel' : 'Schedule inspection'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form
+          onSubmit={createAppt}
+          className="bg-white rounded-card border border-divider shadow-card p-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
+          <label className="text-body-sm text-navy md:col-span-1">
+            Listing ID
+            <input
+              required
+              value={form.listing_id}
+              onChange={(e) => setForm({ ...form, listing_id: e.target.value })}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <label className="text-body-sm text-navy md:col-span-1">
+            Property title (optional)
+            <input
+              value={form.property_title}
+              onChange={(e) => setForm({ ...form, property_title: e.target.value })}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <label className="text-body-sm text-navy">
+            Buyer name
+            <input
+              required
+              value={form.buyer_name}
+              onChange={(e) => setForm({ ...form, buyer_name: e.target.value })}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <label className="text-body-sm text-navy">
+            Buyer phone
+            <input
+              required
+              value={form.buyer_phone}
+              onChange={(e) => setForm({ ...form, buyer_phone: e.target.value })}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <label className="text-body-sm text-navy md:col-span-2">
+            Scheduled date &amp; time
+            <input
+              required
+              type="datetime-local"
+              value={form.scheduled_at}
+              onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <label className="text-body-sm text-navy md:col-span-2">
+            Notes (optional)
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={2}
+              className="mt-1 w-full px-3 py-2 rounded-input border border-divider focus:outline-none focus:ring-2 focus:ring-action"
+            />
+          </label>
+          <div className="md:col-span-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={creating}
+              className="px-4 py-2 rounded-button bg-action text-white text-body-sm font-semibold disabled:opacity-50"
+            >
+              {creating ? 'Scheduling…' : 'Schedule'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="hidden">
         {(['upcoming', 'past', 'all'] as const).map((s) => (
           <button
             key={s}
