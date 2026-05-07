@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { agency } from '@/lib/agency-api'
 import { formatDateTime, statusClass } from '@/lib/format'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
@@ -38,11 +38,27 @@ export default function AgencyInspectionsPage() {
 
   const reload = () =>
     agency
-      .get<Resp>('/inspections?limit=500')
+      .get<Resp>('/appointments?limit=500')
       .then((v) => setItems(Array.isArray(v) ? v : v.items || v.data || []))
       .catch((e) => setError((e as Error).message))
 
-  useEffect(() => { reload() }, [])
+  useEffect(() => {
+    reload()
+  }, [])
+
+  const upcomingSlots = useMemo(() => {
+    if (!items) return []
+    const now = Date.now()
+    return [...items]
+      .map((a) => {
+        const raw = a.scheduled_for || (a.date ? `${a.date}T${(a.time || '10:00').replace(/\s*(AM|PM)\s*$/i, '').slice(0, 5)}:00` : '')
+        const _t = raw ? new Date(raw).getTime() : NaN
+        return { ...a, _t }
+      })
+      .filter((a) => Number.isFinite(a._t) && a._t >= now)
+      .sort((a, b) => a._t - b._t)
+      .slice(0, 50)
+  }, [items])
 
   const createAppt = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,6 +71,7 @@ export default function AgencyInspectionsPage() {
         buyer_phone: form.buyer_phone,
         date: form.scheduleDate,
         time: form.scheduleTime,
+        scheduled_at: `${form.scheduleDate}T${form.scheduleTime}:00`,
         notes: form.notes || undefined,
       })
       setForm({
@@ -204,6 +221,48 @@ export default function AgencyInspectionsPage() {
         </form>
       )}
 
+      {upcomingSlots.length > 0 && (
+        <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
+          <div className="px-6 py-4 border-b border-divider bg-beige/40">
+            <h2 className="text-body-sm font-semibold text-navy">Next scheduled</h2>
+            <p className="text-caption text-subtle mt-0.5">
+              Soonest slots (from your saved appointments)
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-beige/50 text-caption font-semibold text-subtle uppercase tracking-wider">
+                  <th className="px-6 py-3">When</th>
+                  <th className="px-6 py-3">Property</th>
+                  <th className="px-6 py-3">Buyer</th>
+                  <th className="px-6 py-3">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {upcomingSlots.map((a) => (
+                  <tr key={`up-${a.id}`} className="hover:bg-beige/30">
+                    <td className="px-6 py-3 text-body-sm font-semibold text-navy">
+                      {formatDateTime(a.scheduled_for || a.date)}
+                    </td>
+                    <td className="px-6 py-3 text-body-sm text-navy">
+                      {a.property_title || `#${a.property_id || '—'}`}
+                    </td>
+                    <td className="px-6 py-3">
+                      <p className="text-body-sm text-navy">{a.buyer_name || '—'}</p>
+                      <p className="text-caption text-subtle">{a.buyer_phone || '—'}</p>
+                    </td>
+                    <td className="px-6 py-3 text-caption text-subtle max-w-xs line-clamp-2">
+                      {a.notes || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-10 text-center text-body-sm text-subtle">
@@ -217,6 +276,7 @@ export default function AgencyInspectionsPage() {
                   <th className="px-6 py-3">When</th>
                   <th className="px-6 py-3">Property</th>
                   <th className="px-6 py-3">Buyer</th>
+                  <th className="px-6 py-3">Notes</th>
                   <th className="px-6 py-3">Status</th>
                 </tr>
               </thead>
@@ -234,6 +294,9 @@ export default function AgencyInspectionsPage() {
                     <td className="px-6 py-4">
                       <p className="text-body-sm text-navy">{a.buyer_name || '—'}</p>
                       <p className="text-caption text-subtle">{a.buyer_phone || '—'}</p>
+                    </td>
+                    <td className="px-6 py-4 max-w-xs text-caption text-subtle line-clamp-2">
+                      {a.notes || '—'}
                     </td>
                     <td className="px-6 py-4">
                       <select

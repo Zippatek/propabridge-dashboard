@@ -28,7 +28,8 @@ async function handle(
     if (path === 'overview') return mock.MOCK_OVERVIEW
     if (path === 'listings') return mock.MOCK_LISTINGS
     if (path === 'leads') return mock.MOCK_LEADS
-    if (path === 'inspections') return mock.MOCK_INSPECTIONS
+    if (path === 'inspections' || path.startsWith('inspections?')) return mock.MOCK_INSPECTIONS
+    if (path === 'appointments' || path.startsWith('appointments?')) return mock.MOCK_INSPECTIONS
     if (path === 'commissions') return mock.MOCK_COMMISSIONS
     if (path === 'profile') return mock.MOCK_PROFILE
     // Sub-resource paths (e.g. listings/{id} for the edit page)

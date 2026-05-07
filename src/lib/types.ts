@@ -95,8 +95,11 @@ export interface BackendAppointment {
   id: string
   lead_id?: string
   property_id?: string
+  listing_id?: string
+  agency_name?: string
   status?: string
   scheduled_for?: string
+  scheduled_at?: string
   date?: string
   time?: string
   notes?: string

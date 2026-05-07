@@ -18,7 +18,7 @@ export default function AdminInspectionsPage() {
   useEffect(() => {
     setItems(null)
     setError(null)
-    be.get<Resp>('/scheduler/appointments?limit=500')
+    be.get<Resp>('/admin/appointments?limit=500')
       .then((v) => setItems(Array.isArray(v) ? v : v.items || v.data || []))
       .catch((e) => setError((e as Error).message))
   }, [])
@@ -54,7 +54,7 @@ export default function AdminInspectionsPage() {
     return scope === 'upcoming' ? t >= now : t < now
   })
 
-  const statusOptions = ['scheduled', 'confirmed', 'completed', 'cancelled']
+  const statusOptions = ['scheduled', 'pending', 'confirmed', 'completed', 'cancelled']
 
   return (
     <div className="space-y-6">
@@ -85,6 +85,7 @@ export default function AdminInspectionsPage() {
               <thead>
                 <tr className="bg-beige/50 text-caption font-semibold text-subtle uppercase tracking-wider">
                   <th className="px-6 py-3">When</th>
+                  <th className="px-6 py-3">Agency</th>
                   <th className="px-6 py-3">Property / Lead</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Notes</th>
@@ -99,6 +100,9 @@ export default function AdminInspectionsPage() {
                         {formatDateTime(a.scheduled_for || a.date)}
                       </p>
                       {a.time && <p className="text-caption text-subtle">{a.time}</p>}
+                    </td>
+                    <td className="px-6 py-4 text-body-sm text-navy">
+                      {a.agency_name || '—'}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-body-sm text-navy">
