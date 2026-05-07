@@ -659,6 +659,156 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
   )
 }
 
+
+// ─── Rewrite Drawer (AI content rewrite) ─────────────────────────────────────
+
+interface RewriteResult {
+  description: string
+  summary: string
+  search_keywords: string[]
+  before: { description: string }
+}
+
+function RewriteDrawer({
+  listing,
+  onClose,
+  onApplied,
+}: {
+  listing: Listing
+  onClose: () => void
+  onApplied: (updated: Listing) => void
+}) {
+  const [loading, setLoading] = useState(true)
+  const [applying, setApplying] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [result, setResult] = useState<RewriteResult | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      setLoading(true); setErr(null)
+      try {
+        const res = await fetch('/api/admin/ai-rewrite', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ propertyId: listing.id, property: listing }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || `Rewrite failed (${res.status})`)
+        if (!cancelled) setResult(json as RewriteResult)
+      } catch (e) {
+        if (!cancelled) setErr((e as Error).message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [listing.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const apply = async () => {
+    if (!result) return
+    setApplying(true); setErr(null)
+    try {
+      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', {
+        description: result.description,
+        summary: result.summary,
+        search_keywords: result.search_keywords,
+      })
+      // Best-effort embedding refresh — never blocks. If neither the api-gateway
+      // nor the ADK exposes a refresh route, the call simply 404s and we move on.
+      // TODO: wire up POST /admin/properties/:id/embed when ADK exposes it.
+      fetch(`/api/admin/be/admin/properties/${listing.id}/embed`, {
+        method: 'POST', credentials: 'same-origin',
+      }).catch(() => {})
+      onApplied({ ...listing, ...updated, description: result.description })
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-navy/30 backdrop-blur-sm z-40 animate-fade-up" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-full max-w-[640px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-left">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-divider">
+          <div>
+            <p className="text-caption text-subtle uppercase tracking-wide font-semibold flex items-center gap-1.5">
+              <Sparkles size={12} className="text-action" /> AI Rewrite
+            </p>
+            <h3 className="text-h4 text-navy mt-0.5 line-clamp-1">{listing.title || 'Untitled'}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-button hover:bg-beige text-subtle hover:text-navy">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {loading && (
+            <div className="flex items-center gap-2 text-subtle text-body-sm">
+              <Loader2 size={14} className="animate-spin" /> Generating clean copy from row data…
+            </div>
+          )}
+          {err && (
+            <div className="bg-danger-light border border-danger/20 text-danger text-body-sm rounded-card px-4 py-3">{err}</div>
+          )}
+          {result && (
+            <>
+              <div>
+                <p className="text-caption text-subtle font-semibold uppercase tracking-wide mb-1.5">Summary (≤160 chars)</p>
+                <div className="rounded-input border border-divider bg-beige/50 px-3 py-2.5 text-body-sm text-navy">
+                  {result.summary || <span className="text-subtle italic">empty</span>}
+                </div>
+              </div>
+              <div>
+                <p className="text-caption text-subtle font-semibold uppercase tracking-wide mb-1.5">Search keywords</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(result.search_keywords || []).map(k => (
+                    <span key={k} className="px-2 py-0.5 rounded-badge bg-action-light text-action text-[11px] font-semibold">{k}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <p className="text-caption text-subtle font-semibold uppercase tracking-wide mb-1.5">Before</p>
+                  <div className="rounded-input border border-divider bg-beige/30 px-3 py-2.5 text-body-sm text-subtle whitespace-pre-wrap max-h-56 overflow-y-auto">
+                    {result.before.description || <span className="italic">no description on file</span>}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-caption text-subtle font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                    <Sparkles size={11} className="text-action" /> After
+                  </p>
+                  <div className="rounded-input border-2 border-action/30 bg-white px-3 py-2.5 text-body-sm text-navy whitespace-pre-wrap max-h-80 overflow-y-auto">
+                    {result.description}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-divider flex items-center gap-3">
+          <button
+            onClick={apply}
+            disabled={!result || applying || loading}
+            className="flex-1 flex items-center justify-center gap-2 bg-action hover:bg-action-hover text-white font-semibold py-3 rounded-button disabled:opacity-50"
+          >
+            {applying ? <Loader2 size={14} className="animate-spin" /> : <Check size={15} strokeWidth={2.5} />}
+            {applying ? 'Applying…' : 'Apply rewrite'}
+          </button>
+          <button onClick={onClose} className="px-5 py-3 rounded-button border border-divider text-subtle hover:text-navy hover:bg-beige text-body-sm font-semibold">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const STATUS_FILTERS = ['all', 'verified', 'submitted', 'in_review', 'needs_info', 'draft', 'rejected']
@@ -672,6 +822,7 @@ export default function AdminListingsPage() {
   const [editTarget, setEditTarget] = useState<Listing | null>(null)
   const [togglingId, setToggling]   = useState<string | null>(null)
   const [showAdd, setShowAdd]       = useState(false)
+  const [rewriteTarget, setRewriteTarget] = useState<Listing | null>(null)
 
   const [bucketOrphans, setBucketOrphans] = useState<
     { url: string; path: string; agency_id?: string }[] | null
@@ -825,6 +976,15 @@ export default function AdminListingsPage() {
           listing={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {/* Rewrite drawer */}
+      {rewriteTarget && (
+        <RewriteDrawer
+          listing={rewriteTarget}
+          onClose={() => setRewriteTarget(null)}
+          onApplied={(updated) => { handleSaved(updated); setRewriteTarget(null) }}
         />
       )}
 
@@ -1103,6 +1263,16 @@ export default function AdminListingsPage() {
                           {l.verification_status === 'draft'
                             ? <><Send size={12} strokeWidth={2} /><span className="hidden sm:inline">Publish</span></>
                             : <><FileText size={12} strokeWidth={2} /><span className="hidden sm:inline">Draft</span></>}
+                        </button>
+
+                        {/* AI Rewrite */}
+                        <button
+                          onClick={() => setRewriteTarget(l)}
+                          title="Rewrite with AI"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-button bg-action-light text-action hover:bg-action hover:text-white text-caption font-semibold transition-all duration-150"
+                        >
+                          <Sparkles size={12} strokeWidth={2} />
+                          <span className="hidden sm:inline">Rewrite</span>
                         </button>
 
                         {/* Edit */}
