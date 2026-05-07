@@ -229,7 +229,7 @@ export function ListingWizard() {
         findings: Array<{ id: string; code: string; severity: string; message: string }>
       }
       const res = await agency.send<SubmitResp>('/listings', 'POST', body)
-      setResult(res)
+      setResult({ ...res, findings: res.findings ?? [] })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -240,8 +240,9 @@ export function ListingWizard() {
   // ── success screen ────────────────────────────────────────────────────────
 
   if (result) {
-    const blocks = result.findings.filter((f) => f.severity === 'block')
-    const flags = result.findings.filter((f) => f.severity === 'flag')
+    const findings = result.findings ?? []
+    const blocks = findings.filter((f) => f.severity === 'block')
+    const flags = findings.filter((f) => f.severity === 'flag')
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="bg-white rounded-card border border-divider shadow-card p-8 text-center">
