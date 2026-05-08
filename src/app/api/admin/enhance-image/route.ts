@@ -6,15 +6,12 @@ import { isAdminAuthed } from '@/lib/admin-auth'
  * POST /api/admin/enhance-image
  * Body: { imageUrl: string }
  *
- * Calls Gemini image model (configurable via GEMINI_IMAGE_MODEL) to enhance a
- * property photo. Returns { enhancedImageUrl: string } (base64 data URL).
+ * Calls a Gemini image-capable model (default gemini-2.5-flash-image) to
+ * enhance a property photo. Returns { enhancedImageUrl: string } (base64 data URL).
  *
  * Non-destructive: the original is never modified; the caller chooses whether
  * to replace it.
  */
-
-
-const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview'
 
 const ENHANCE_PROMPT =
   'Enhance this property photo: improve lighting, clarity, and visual appeal ' +
@@ -35,9 +32,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const apiKey = process.env.GOOGLE_CLOUD_API_KEY
+  const apiKey =
+    process.env.GOOGLE_CLOUD_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'GOOGLE_CLOUD_API_KEY not configured' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'No Gemini API key configured (set GOOGLE_CLOUD_API_KEY or GEMINI_API_KEY)' },
+      { status: 500 },
+    )
   }
 
   let body: { imageUrl?: string }
@@ -56,8 +59,16 @@ export async function POST(req: Request) {
     const { data, mimeType } = await fetchImageAsBase64(imageUrl)
 
     const genai = new GoogleGenerativeAI(apiKey)
+    const imageModel =
+      process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
+
     const model = genai.getGenerativeModel({
-      model: IMAGE_MODEL,
+      model: imageModel,
+      // Image-out models require an explicit modality; omitted types in @google/generative-ai.
+      generationConfig: {
+        temperature: 0.35,
+        responseModalities: ['IMAGE'],
+      } as Record<string, unknown>,
     })
 
     const result = await model.generateContent([
@@ -84,7 +95,7 @@ export async function POST(req: Request) {
         {
           error:
             'Gemini did not return an enhanced image. ' +
-            `Ensure the configured image model (${IMAGE_MODEL}) is available for your API key.`,
+            'Confirm GEMINI_IMAGE_MODEL / API key access for native image output.',
         },
         { status: 502 },
       )
