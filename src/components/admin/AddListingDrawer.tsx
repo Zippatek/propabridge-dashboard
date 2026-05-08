@@ -18,9 +18,11 @@ import {
   Loader2,
   Upload,
   Trash2,
+  ClipboardPaste,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
+import { mergeParsedIntoAnswers, parseListingPasteFromText } from '@/lib/parse-listing-paste'
 import type { AiListingAnswers, AiListingResponse } from '@/app/api/admin/ai-listing/route'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -248,8 +250,24 @@ function QuestionsStep({
   onGenerate: () => void
   generating: boolean
 }) {
+  const [pasteText, setPasteText] = useState('')
+  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null)
+
   const set = <K extends keyof AiListingAnswers>(k: K, v: AiListingAnswers[K]) =>
     onChange({ ...answers, [k]: v })
+
+  const applyPastedRows = () => {
+    setPasteFeedback(null)
+    const parsed = parseListingPasteFromText(pasteText)
+    onChange(mergeParsedIntoAnswers(answers, parsed))
+    const bits: string[] = ['Merged pasted values into the form.']
+    if (parsed.unknownKeys.length) {
+      bits.push(
+        `Could not map: ${parsed.unknownKeys.slice(0, 12).join(', ')}${parsed.unknownKeys.length > 12 ? '…' : ''}.`,
+      )
+    }
+    setPasteFeedback(bits.join(' '))
+  }
 
   const inputCls =
     'w-full px-3 py-2.5 rounded-input border border-divider bg-white text-navy text-body-sm ' +
@@ -284,6 +302,51 @@ function QuestionsStep({
             Answer the questions below and our AI will craft a polished listing and pre-fill every structured field.
           </p>
         </div>
+
+        <details className="rounded-card border border-divider bg-white overflow-hidden group">
+          <summary className="px-4 py-3 cursor-pointer text-body-sm font-semibold text-navy flex items-center gap-2 hover:bg-beige/40 list-none [&::-webkit-details-marker]:hidden">
+            <ClipboardPaste size={16} className="text-action flex-shrink-0" strokeWidth={2} />
+            Paste row / sheet data to fill fields
+            <ChevronRight size={14} className="text-subtle ml-auto group-open:rotate-90 transition-transform" />
+          </summary>
+          <div className="px-4 pb-4 pt-0 space-y-3 border-t border-divider">
+            <p className="text-caption text-subtle pt-3">
+              Paste from Excel or Sheets (header row + data row), tab-separated lines, or lines like{' '}
+              <code className="text-[11px] bg-beige px-1 rounded">Price: 180000000</code>. Known columns map into the
+              wizard; anything unknown is listed after merge.
+            </p>
+            <textarea
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              rows={5}
+              placeholder={
+                'Example:\nCity\tAbuja\nNeighborhood\tKarsana\nBedrooms\t4\nBathrooms\t5\nPrice\t180000000\nLocation\tLillyCrest Residence'
+              }
+              className={`${inputCls} font-mono text-[12px] resize-y min-h-[100px]`}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={applyPastedRows}
+                disabled={!pasteText.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-button bg-navy text-white text-body-sm font-semibold hover:bg-navy/90 disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <ClipboardPaste size={14} />
+                Apply to form
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPasteText(''); setPasteFeedback(null) }}
+                className="text-caption text-subtle hover:text-navy px-2"
+              >
+                Clear
+              </button>
+            </div>
+            {pasteFeedback && (
+              <p className="text-caption text-navy bg-beige/60 border border-divider rounded-input px-3 py-2">{pasteFeedback}</p>
+            )}
+          </div>
+        </details>
 
         {sectionHeader(1, 'The basics')}
 
