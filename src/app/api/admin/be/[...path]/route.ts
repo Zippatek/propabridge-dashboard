@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isAdminAuthed } from '@/lib/admin-auth'
 import { beFetch, ApiError } from '@/lib/api'
+import { normalizeListingTypeForDb } from '@/lib/listing-type'
 
 /**
  * Proxy: /api/admin/be/* → propabridge-backend api-gateway /*
@@ -10,6 +11,30 @@ import { beFetch, ApiError } from '@/lib/api'
  *   GET /api/admin/be/leads                →  GET <backend>/leads
  *   POST /api/admin/be/scheduler/book      →  POST <backend>/scheduler/book
  */
+
+/**
+ * Coalesce `listing_type` + `transaction_type` and normalize before forwarding.
+ * Matches api-gateway `normalizeListingType` + migration 022 CHECK tokens.
+ */
+function normalizeForwardedListingBody(bodyText: string, pathJoined: string): string {
+  const root = pathJoined.split('/')[0]
+  if (root !== 'listings') return bodyText
+  try {
+    const obj = JSON.parse(bodyText) as Record<string, unknown>
+    if (!('listing_type' in obj) && !('transaction_type' in obj)) return bodyText
+
+    const coalesced = obj.listing_type || obj.transaction_type
+    const norm = normalizeListingTypeForDb(
+      coalesced !== undefined && coalesced !== null ? String(coalesced) : null,
+    )
+    if (norm !== null) obj.listing_type = norm
+    else delete obj.listing_type
+    delete obj.transaction_type
+    return JSON.stringify(obj)
+  } catch {
+    return bodyText
+  }
+}
 
 async function handle(
   req: Request,
@@ -25,7 +50,12 @@ async function handle(
   const init: RequestInit = { method }
   if (method !== 'GET' && method !== 'DELETE') {
     const body = await req.text()
-    if (body) init.body = body
+    if (body) {
+      init.body =
+        method === 'POST' || method === 'PATCH' || method === 'PUT'
+          ? normalizeForwardedListingBody(body, ctx.params.path.join('/'))
+          : body
+    }
   }
 
   try {

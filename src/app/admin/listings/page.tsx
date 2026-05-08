@@ -95,6 +95,49 @@ function formatPrice(n?: number | null) {
   return `₦${n}`
 }
 
+function firstNonEmptyString(...vals: unknown[]): string | undefined {
+  for (const v of vals) {
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
+  return undefined
+}
+
+/** Prefer the canonical copy field whichever shape the gateway returns. */
+function listingDescriptionFromRow(item: Record<string, unknown>): string | null {
+  const s = firstNonEmptyString(
+    item.description,
+    item.long_description,
+    item.longDescription,
+    item.description_md,
+    item.description_markdown,
+    item.long_description_md,
+    item.long_description_markdown,
+  )
+  return s ?? null
+}
+
+/**
+ * PATCH body for AI rewrite apply — mirrors manual `description` save and adds
+ * aliases the api-gateway / property row may persist (`*_md`, `long_*`).
+ */
+function buildRewriteListingPatchBody(
+  descriptionMarkdown: string,
+  summary: string,
+  searchKeywords: string[],
+): Record<string, unknown> {
+  const md = descriptionMarkdown.trim()
+  const body: Record<string, unknown> = {
+    description: md,
+    description_md: md,
+    long_description: md,
+    long_description_md: md,
+  }
+  const sum = summary.trim()
+  if (sum) body.summary = sum
+  if (searchKeywords.length) body.search_keywords = searchKeywords
+  return body
+}
+
 const STATUS_STYLES: Record<string, string> = {
   verified:  'bg-verified-light text-verified border border-verified/20',
   submitted: 'bg-gold/15 text-amber-700 border border-gold/30',
@@ -824,17 +867,19 @@ function RewriteDrawer({
     if (!result) return
     setApplying(true); setErr(null)
     try {
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', {
-        description: result.description,
-        summary: result.summary,
-        search_keywords: result.search_keywords,
-      })
+      const payload = buildRewriteListingPatchBody(
+        result.description,
+        result.summary,
+        result.search_keywords || [],
+      )
+      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
       // Best-effort embedding refresh — never blocks upstream 404/501.
       // Proxy: /api/admin/be/<path> → api-gateway /<path> (same prefix as /listings).
       fetch(`/api/admin/be/properties/${listing.id}/embed`, {
         method: 'POST', credentials: 'same-origin',
       }).catch(() => {})
-      onApplied({ ...listing, ...updated, description: result.description })
+      const md = result.description.trim()
+      onApplied({ ...listing, ...updated, description: md })
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -935,6 +980,7 @@ export default function AdminListingsPage() {
   const [togglingId, setToggling]   = useState<string | null>(null)
   const [showAdd, setShowAdd]       = useState(false)
   const [rewriteTarget, setRewriteTarget] = useState<Listing | null>(null)
+  const [rewriteSavedToast, setRewriteSavedToast] = useState(false)
 
   const [bucketOrphans, setBucketOrphans] = useState<
     { url: string; path: string; agency_id?: string }[] | null
@@ -974,7 +1020,7 @@ export default function AdminListingsPage() {
           construction_status: item.construction_status as string | null | undefined,
           condition:           item.condition           as string | null | undefined,
           intent:              item.intent              as string | null | undefined,
-          description:         item.description         as string | null | undefined,
+          description:         listingDescriptionFromRow(item),
           neighborhood:        item.neighborhood        as string | null | undefined,
           address:             item.address             as string | null | undefined,
           payment_plan:        item.payment_plan        as string | null | undefined,
@@ -1032,10 +1078,20 @@ export default function AdminListingsPage() {
     }
   }
 
-  const handleSaved = (updated: Listing) => {
+  const upsertListingRow = useCallback((updated: Listing) => {
     setListings(prev => prev?.map(x => x.id === updated.id ? { ...x, ...updated } : x) ?? null)
+  }, [])
+
+  const handleSaved = (updated: Listing) => {
+    upsertListingRow(updated)
     setEditTarget(null)
   }
+
+  useEffect(() => {
+    if (!rewriteSavedToast) return
+    const t = setTimeout(() => setRewriteSavedToast(false), 4200)
+    return () => clearTimeout(t)
+  }, [rewriteSavedToast])
 
   const deleteListing = async (l: Listing) => {
     if (!confirm('Delete this listing? This cannot be undone.')) return
@@ -1085,6 +1141,14 @@ export default function AdminListingsPage() {
 
   return (
     <>
+      {rewriteSavedToast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 px-4 py-2.5 rounded-button bg-navy text-white text-body-sm font-semibold shadow-lg animate-fade-up"
+        >
+          Rewrite saved to the listing.
+        </div>
+      )}
       {/* Edit drawer */}
       {editTarget && (
         <EditDrawer
@@ -1099,7 +1163,11 @@ export default function AdminListingsPage() {
         <RewriteDrawer
           listing={rewriteTarget}
           onClose={() => setRewriteTarget(null)}
-          onApplied={(updated) => { handleSaved(updated); setRewriteTarget(null) }}
+          onApplied={(updated) => {
+            upsertListingRow(updated)
+            setRewriteSavedToast(true)
+            setRewriteTarget(null)
+          }}
         />
       )}
 
