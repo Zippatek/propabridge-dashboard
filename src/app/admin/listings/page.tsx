@@ -24,6 +24,7 @@ import {
   Wand2,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
+import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 import AddListingDrawer from '@/components/admin/AddListingDrawer'
 
@@ -120,7 +121,6 @@ interface EditDrawerProps {
   onSaved: (updated: Listing) => void
 }
 
-const LISTING_TYPES   = ['sale', 'rent', 'shortlet', 'for_sale', 'for_rent', 'off_plan', 'commercial', 'land', 'rental', 'lease']
 const PROPERTY_TYPES  = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
 const VERIFY_STATUSES = ['draft', 'submitted', 'in_review', 'needs_info', 'verified', 'rejected']
 
@@ -364,7 +364,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
     neighborhood:        listing.neighborhood || '',
     address:             listing.address || '',
     price:               listing.price ? String(listing.price) : '',
-    listing_type:        listing.listing_type  || 'sale',
+    listing_type:        normalizeListingType(listing.listing_type),
     property_type:       listing.property_type || 'apartment',
     intent:              listing.intent || '',
     bedrooms:            listing.bedrooms  != null ? String(listing.bedrooms)  : '',
@@ -412,7 +412,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         neighborhood: form.neighborhood || undefined,
         address:      form.address      || undefined,
         slug:         form.slug         || undefined,
-        listing_type:  form.listing_type,
+        listing_type:  normalizeListingType(form.listing_type),
         property_type: form.property_type,
         intent:       form.intent       || undefined,
         featured:            form.featured,
@@ -558,7 +558,11 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
               <span className="text-caption text-subtle font-semibold mb-1.5 block">Listing type</span>
               <div className="relative">
                 <select className={selectCls} value={form.listing_type} onChange={e => set('listing_type', e.target.value)}>
-                  {LISTING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {LISTING_TYPES_DB.map(t => (
+                    <option key={t} value={t}>
+                      {t === 'sale' ? 'Sale' : 'Rent'}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
               </div>
@@ -825,10 +829,9 @@ function RewriteDrawer({
         summary: result.summary,
         search_keywords: result.search_keywords,
       })
-      // Best-effort embedding refresh — never blocks. If neither the api-gateway
-      // nor the ADK exposes a refresh route, the call simply 404s and we move on.
-      // TODO: wire up POST /admin/properties/:id/embed when ADK exposes it.
-      fetch(`/api/admin/be/admin/properties/${listing.id}/embed`, {
+      // Best-effort embedding refresh — never blocks upstream 404/501.
+      // Proxy: /api/admin/be/<path> → api-gateway /<path> (same prefix as /listings).
+      fetch(`/api/admin/be/properties/${listing.id}/embed`, {
         method: 'POST', credentials: 'same-origin',
       }).catch(() => {})
       onApplied({ ...listing, ...updated, description: result.description })
@@ -956,7 +959,9 @@ export default function AdminListingsPage() {
           title:               item.title               as string | undefined,
           slug:                item.slug                as string | undefined,
           city:                item.city                as string | undefined,
-          listing_type:        (item.listing_type || item.transaction_type) as string | undefined,
+          listing_type:        normalizeListingType(
+            (item.listing_type || item.transaction_type) as string | undefined,
+          ),
           property_type:       (item.property_type || item.type)            as string | undefined,
           bedrooms:            item.bedrooms  as number | null | undefined,
           bathrooms:           item.bathrooms as number | null | undefined,

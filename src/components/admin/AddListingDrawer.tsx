@@ -20,6 +20,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
+import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
 import type { AiListingAnswers, AiListingResponse } from '@/app/api/admin/ai-listing/route'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -31,7 +32,7 @@ interface AddListingDrawerProps {
 
 type Step = 'questions' | 'generating' | 'review'
 
-const LISTING_TYPES  = ['sale', 'rent', 'shortlet']
+const LISTING_TYPES = LISTING_TYPES_DB
 const PROPERTY_TYPES = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
 
 const TITLE_TYPES = [
@@ -288,7 +289,13 @@ function QuestionsStep({
 
         <div className="grid grid-cols-2 gap-3">
           <SelectFld label="Property type *" value={answers.property_type} onChange={v => set('property_type', v)} options={PROPERTY_TYPES.map(t => [t, t.charAt(0).toUpperCase() + t.slice(1)])} cls={selectCls} />
-          <SelectFld label="Listing type *" value={answers.listing_type} onChange={v => set('listing_type', v)} options={LISTING_TYPES.map(t => [t, t.charAt(0).toUpperCase() + t.slice(1)])} cls={selectCls} />
+          <SelectFld
+            label="Listing type *"
+            value={answers.listing_type}
+            onChange={v => set('listing_type', v)}
+            options={LISTING_TYPES.map(t => [t, t === 'sale' ? 'Sale' : 'Rent'])}
+            cls={selectCls}
+          />
         </div>
         <SelectFld label="Intent" value={answers.intent || 'for_sale'} onChange={v => set('intent', v)} options={INTENT_OPTS as readonly (readonly [string, string])[]} cls={selectCls} />
         <div className="grid grid-cols-3 gap-3">
@@ -702,7 +709,9 @@ function ReviewStep({
             <span className="text-caption text-subtle font-semibold mb-1.5 block">Listing type</span>
             <div className="relative">
               <select className={selectCls} value={fields.listing_type} onChange={e => set('listing_type', e.target.value)}>
-                {LISTING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {LISTING_TYPES.map(t => (
+                  <option key={t} value={t}>{t === 'sale' ? 'Sale' : 'Rent'}</option>
+                ))}
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
             </div>
@@ -820,7 +829,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         city:          f.city  || answers.city || '',
         neighborhood:  f.neighborhood || answers.neighborhood || '',
         address:       f.address || answers.address_line || '',
-        listing_type:  f.listing_type  || answers.listing_type,
+        listing_type:  normalizeListingType(f.listing_type || answers.listing_type),
         property_type: f.property_type || answers.property_type,
         bedrooms:      f.bedrooms  != null ? String(f.bedrooms)  : answers.bedrooms,
         bathrooms:     f.bathrooms != null ? String(f.bathrooms) : answers.bathrooms,
@@ -847,7 +856,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         title:         reviewFields.title         || undefined,
         slug:          reviewFields.slug          || undefined,
         description:   reviewFields.description   || undefined,
-        listing_type:  reviewFields.listing_type,
+        listing_type:  normalizeListingType(reviewFields.listing_type),
         property_type: reviewFields.property_type,
         // location
         city:          reviewFields.city          || undefined,

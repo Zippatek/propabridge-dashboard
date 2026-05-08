@@ -11,7 +11,7 @@ const client = new Anthropic({
 export interface AiListingAnswers {
   // basics
   property_type: string
-  listing_type: string         // 'sale' | 'rent' | 'shortlet'
+  listing_type: string         // 'sale' | 'rent' (DB enum)
   intent?: string              // 'for_sale' | 'for_rent' | 'off_plan'
   bedrooms: string
   bathrooms: string
@@ -163,7 +163,7 @@ Format your response EXACTLY like this — description first, then the JSON bloc
   "city": "string — city name only (e.g. Lagos, Abuja, Port Harcourt)",
   "neighborhood": "string or empty",
   "address": "string or empty",
-  "listing_type": "sale | rent | shortlet",
+  "listing_type": "sale | rent",
   "property_type": "apartment | house | duplex | bungalow | land | commercial | villa | penthouse",
   "bedrooms": number or null,
   "bathrooms": number or null,
