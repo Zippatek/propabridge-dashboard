@@ -62,6 +62,7 @@ export interface AiListingAnswers {
   amenities?: string[]
   key_features: string
   additional_points?: string
+  units_available?: string
 }
 
 export interface AiListingResponse {
@@ -81,6 +82,7 @@ export interface AiListingResponse {
     amenities?: string[]
     latitude?: number | null
     longitude?: number | null
+    units_available?: number | null
   }
 }
 
@@ -125,6 +127,7 @@ function buildPrompt(a: AiListingAnswers): string {
     line('Amenities', a.amenities && a.amenities.length ? a.amenities.join(', ') : undefined),
     line('Key features', a.key_features),
     line('Additional selling points', a.additional_points),
+    line('Units available', a.units_available),
   ].filter(Boolean).join('\n')
 
   return `You are an expert Nigerian real estate copywriter with deep knowledge of the Lagos, Abuja, and Port Harcourt property markets. Your writing is persuasive, sophisticated, and speaks directly to high-net-worth buyers and investors. You blend aspirational lifestyle language with concrete property specifications.
@@ -134,7 +137,15 @@ A property listing needs to be created with the following details:
 ${facts}
 
 Your task:
-1. Write a polished, compelling property description in **Markdown format** (use ## for section headings, **bold** for key specs, bullet lists for features, amenities, and title/legal highlights). Reference the title type, payment plan, utilities, construction status, and amenities where present. The description should be 4–6 paragraphs. Write in a tone that appeals to discerning Nigerian buyers and diaspora investors.
+1. Write a polished, compelling property description in **Markdown format** using these sections:
+   ## Overview — property type, bedrooms/bathrooms, size, location, listing type, price
+   ## Key Features — bullet list of standout specs and selling points
+   ## Location Highlights — neighborhood or city context
+   ## Investment Potential — (only for sale/off-plan) why this is a strong investment
+   ## Amenities — bullet list from the amenities provided (omit if none)
+   ## Units Available — (only if units_available is set) state remaining units
+   
+   Reference the title type, payment plan, utilities, construction status throughout where present. Write for discerning Nigerian buyers and diaspora investors. Total length: 250–450 words.
 
 2. After the description, output a JSON block with suggested structured fields. Infer the city if not explicitly given. Generate a URL-friendly slug from the title (lowercase, hyphens, no special chars). Use these exact keys.
 
@@ -159,7 +170,8 @@ Format your response EXACTLY like this — description first, then the JSON bloc
   "price": number (numeric value only) or null,
   "amenities": ["array","of","short","amenity","strings"],
   "latitude": number or null,
-  "longitude": number or null
+  "longitude": number or null,
+  "units_available": number or null
 }
 [/FIELDS]`
 }

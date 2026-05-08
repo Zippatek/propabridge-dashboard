@@ -46,6 +46,7 @@ interface PropertyRow {
   is_estate_unit?: boolean | null
   estate_name?: string | null
   intent?: string | null
+  units_available?: number | null
 }
 
 const SYSTEM = `You are a world-class Nigerian real-estate copywriter. Your output replaces the existing description on a live listing.
@@ -53,16 +54,37 @@ const SYSTEM = `You are a world-class Nigerian real-estate copywriter. Your outp
 HARD CONSTRAINTS — NEVER VIOLATE:
 - Use ONLY facts present in the provided row. Never invent neighborhoods, prices, amenities, sizes, distances to landmarks, dates, or any other detail.
 - No AI-flavored phrasing ("nestled in", "boasts", "step into a world", "discover the pinnacle", "elevate your lifestyle", "unparalleled", "epitome of"). Plain, confident, human Nigerian-realtor tone.
-- No fluff. No filler sentences. Concise: 120–220 words total.
-- Embedding/search friendly: surface the city, neighborhood, listing type (sale/rent/shortlet), property type, bedrooms, bathrooms, size, key amenities, price (with currency as supplied), construction status, and condition where present.
 - If a fact is missing, simply omit it — do NOT speculate or hedge with "approximately".
 
 OUTPUT FORMAT — respond with ONE JSON object only, no prose, no markdown fences:
 {
-  "description": "<markdown body, 120–220 words, may use short bullet lists for amenities>",
+  "description": "<detailed Markdown description — see structure below>",
   "summary": "<one sentence under 160 chars, factual>",
   "search_keywords": ["lowercase","short","tokens","6-15 of them"]
-}`
+}
+
+DESCRIPTION STRUCTURE (use Markdown headings and formatting):
+Produce a well-structured Markdown description with these sections (omit any section if the row lacks data for it):
+
+## Overview
+One clear paragraph: property type, bedrooms/bathrooms if residential, size, location (city + neighborhood), listing type, price and currency. Construction status and condition if set.
+
+## Key Features
+Bullet list of the property's most important specs and unique selling points drawn strictly from the row fields.
+
+## Location Highlights
+Concise paragraph on the city/neighborhood based solely on what is in the row. Do not fabricate landmarks.
+
+## Investment Potential
+Only include if the listing type is sale, for_sale, or off_plan. One short paragraph on why this is a compelling investment based on the facts in the row.
+
+## Amenities
+Bullet list of amenities from the amenities field only. If amenities is empty, omit this section.
+
+## Units Available
+Only include if units_available is set and greater than 0. State the number of units remaining.
+
+Keep the full description between 200–400 words.`
 
 function buildUserPrompt(p: PropertyRow): string {
   const line = (k: string, v: unknown) =>
@@ -95,6 +117,7 @@ function buildUserPrompt(p: PropertyRow): string {
       'amenities',
       Array.isArray(p.amenities) && p.amenities.length ? p.amenities.join(', ') : null,
     ),
+    line('units_available', p.units_available ?? null),
     line('existing_description', p.description ? String(p.description).slice(0, 1200) : null),
   ]
     .filter(Boolean)

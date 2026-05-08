@@ -21,6 +21,7 @@ import {
   Send,
   FileText,
   Loader2,
+  Wand2,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
@@ -71,6 +72,7 @@ interface Listing {
   intent?: string | null
   amenities?: string[] | null
   images?: string[] | null
+  units_available?: number | null
 }
 
 const CONSTRUCTION_STATUS_OPTS = [
@@ -118,13 +120,16 @@ interface EditDrawerProps {
   onSaved: (updated: Listing) => void
 }
 
-const LISTING_TYPES   = ['sale', 'rent', 'shortlet']
+const LISTING_TYPES   = ['sale', 'rent', 'shortlet', 'for_sale', 'for_rent', 'off_plan', 'commercial', 'land', 'rental', 'lease']
 const PROPERTY_TYPES  = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
 const VERIFY_STATUSES = ['draft', 'submitted', 'in_review', 'needs_info', 'verified', 'rejected']
 
 // Multi-image manager — drag-to-reorder, mark cover, delete, upload more.
 // Persists via PUT /listings/:id/images (replaces full ordered list).
 interface ImageItem { url: string; is_cover: boolean }
+
+// Per-image enhance state: null = idle, 'loading' = enhancing, string = enhanced data URL
+type EnhanceState = null | 'loading' | string
 
 function ImageManager({
   listingId,
@@ -139,9 +144,16 @@ function ImageManager({
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving]   = useState(false)
   const [err, setErr]         = useState<string | null>(null)
+  const [enhanceStates, setEnhanceStates] = useState<EnhanceState[]>(() => initial.map(() => null))
   const dragIdx = useRef<number | null>(null)
 
   const persist = async (next: ImageItem[]) => {
+    // Keep enhanceStates in sync: pad/trim to match new items length
+    setEnhanceStates(prev => {
+      const padded = [...prev]
+      while (padded.length < next.length) padded.push(null)
+      return padded.slice(0, next.length)
+    })
     setItems(next)
     setSaving(true)
     setErr(null)
@@ -177,6 +189,37 @@ function ImageManager({
     persist(next)
   }
 
+  const enhanceImage = async (i: number) => {
+    setEnhanceStates(prev => { const n = [...prev]; n[i] = 'loading'; return n })
+    setErr(null)
+    try {
+      const res = await fetch('/api/admin/enhance-image', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ imageUrl: items[i].url }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `Enhancement failed (${res.status})`)
+      setEnhanceStates(prev => { const n = [...prev]; n[i] = json.enhancedImageUrl as string; return n })
+    } catch (e) {
+      setErr((e as Error).message)
+      setEnhanceStates(prev => { const n = [...prev]; n[i] = null; return n })
+    }
+  }
+
+  const acceptEnhancement = (i: number) => {
+    const enhanced = enhanceStates[i]
+    if (!enhanced || enhanced === 'loading') return
+    const next = items.map((it, j) => j === i ? { ...it, url: enhanced } : it)
+    setEnhanceStates(prev => { const n = [...prev]; n[i] = null; return n })
+    persist(next)
+  }
+
+  const discardEnhancement = (i: number) => {
+    setEnhanceStates(prev => { const n = [...prev]; n[i] = null; return n })
+  }
+
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     setUploading(true); setErr(null)
@@ -208,37 +251,88 @@ function ImageManager({
         {saving && <span className="text-[10px] text-action flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> saving</span>}
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {items.map((it, i) => (
-          <div
-            key={it.url + i}
-            draggable
-            onDragStart={() => onDragStart(i)}
-            onDragOver={onDragOver}
-            onDrop={() => onDrop(i)}
-            className="relative group rounded-input overflow-hidden border border-divider aspect-[4/3] cursor-move bg-beige"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={it.url} alt={`#${i + 1}`} className="w-full h-full object-cover" />
-            <button
-              type="button"
-              onClick={() => setCover(i)}
-              title={it.is_cover ? 'Cover image' : 'Mark as cover'}
-              className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-opacity ${
-                it.is_cover ? 'bg-action text-white opacity-100' : 'bg-white/85 text-navy opacity-0 group-hover:opacity-100'
-              }`}
+        {items.map((it, i) => {
+          const es = enhanceStates[i] ?? null
+          const isEnhancing = es === 'loading'
+          const hasEnhanced = es !== null && es !== 'loading'
+          return (
+          <div key={it.url + i} className="flex flex-col gap-1">
+            <div
+              draggable
+              onDragStart={() => onDragStart(i)}
+              onDragOver={onDragOver}
+              onDrop={() => onDrop(i)}
+              className="relative group rounded-input overflow-hidden border border-divider aspect-[4/3] cursor-move bg-beige"
             >
-              {it.is_cover ? 'Cover' : 'Set cover'}
-            </button>
-            <button
-              type="button"
-              onClick={() => remove(i)}
-              className="absolute top-1 right-1 bg-navy/70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Remove"
-            >
-              <Trash2 size={11} />
-            </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={it.url} alt={`#${i + 1}`} className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setCover(i)}
+                title={it.is_cover ? 'Cover image' : 'Mark as cover'}
+                className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-opacity ${
+                  it.is_cover ? 'bg-action text-white opacity-100' : 'bg-white/85 text-navy opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                {it.is_cover ? 'Cover' : 'Set cover'}
+              </button>
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="absolute top-1 right-1 bg-navy/70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+            {/* Enhance with AI */}
+            {!hasEnhanced ? (
+              <button
+                type="button"
+                onClick={() => enhanceImage(i)}
+                disabled={isEnhancing}
+                className="flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
+              >
+                {isEnhancing
+                  ? <><Loader2 size={9} className="animate-spin" /> Enhancing…</>
+                  : <><Wand2 size={9} /> Enhance</>}
+              </button>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {/* Before / After preview */}
+                <div className="grid grid-cols-2 gap-1">
+                  <div className="relative rounded overflow-hidden aspect-[4/3] border border-divider">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={it.url} alt="Before" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0 left-0 right-0 text-center bg-navy/60 text-white text-[9px] py-0.5">Before</span>
+                  </div>
+                  <div className="relative rounded overflow-hidden aspect-[4/3] border border-action">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={es} alt="Enhanced" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0 left-0 right-0 text-center bg-action/80 text-white text-[9px] py-0.5">Enhanced</span>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => acceptEnhancement(i)}
+                    className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-action text-white hover:bg-action-hover transition-colors"
+                  >
+                    <Check size={9} /> Use enhanced
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => discardEnhancement(i)}
+                    className="flex items-center justify-center px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-danger transition-colors"
+                  >
+                    <X size={9} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        ))}
+          )
+        })}
         <label className={`flex flex-col items-center justify-center rounded-input border-2 border-dashed aspect-[4/3] cursor-pointer transition-colors ${uploading ? 'border-action bg-action-light/20 opacity-60' : 'border-divider hover:border-action hover:bg-beige/30'}`}>
           {uploading
             ? <Loader2 size={18} className="text-action animate-spin" strokeWidth={1.5} />
@@ -297,6 +391,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
     is_estate_unit:      !!listing.is_estate_unit,
     estate_name:         listing.estate_name || '',
     amenities:           Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
+    units_available:     listing.units_available != null ? String(listing.units_available) : '',
   })
   const [images, setImages] = useState<ImageItem[]>(initialImages)
   const [saving, setSaving] = useState(false)
@@ -344,6 +439,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         propabridge_commission_pct:  num(form.propabridge_commission_pct),
         attribution_window_months:   num(form.attribution_window_months),
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
+        units_available: num(form.units_available as string),
       }
       const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
       onSaved({
@@ -578,6 +674,19 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
           <label className="block">
             <span className="text-caption text-subtle font-semibold mb-1.5 block">Amenities (comma-separated)</span>
             <input className={inputCls} value={form.amenities} onChange={e => set('amenities', e.target.value)} placeholder="Pool, Gym, 24hr Security" />
+          </label>
+
+          {/* Units available */}
+          <label className="block">
+            <span className="text-caption text-subtle font-semibold mb-1.5 block">Units available</span>
+            <input
+              className={inputCls}
+              type="number"
+              min={0}
+              value={(form as Record<string, unknown>).units_available as string ?? ''}
+              onChange={e => set('units_available', e.target.value)}
+              placeholder="e.g. 12 (leave blank if N/A)"
+            />
           </label>
 
           {/* Description */}
@@ -878,6 +987,7 @@ export default function AdminListingsPage() {
           estate_name:         item.estate_name         as string | null | undefined,
           built_up_area_sqm:   item.built_up_area_sqm   as number | null | undefined,
           declared_plot_size_sqm: item.declared_plot_size_sqm as number | null | undefined,
+          units_available:      item.units_available as number | null | undefined,
           featured:            item.featured as boolean | undefined,
           verification_status: (item.verification_status || (item.verified ? 'verified' : 'draft')) as string | undefined,
           agency_name:         (item.agency_name || item.agent)  as string | undefined,
@@ -1160,6 +1270,7 @@ export default function AdminListingsPage() {
                   <th className="px-5 py-3">Property</th>
                   <th className="px-5 py-3 hidden md:table-cell">Agency</th>
                   <th className="px-5 py-3 hidden lg:table-cell">Type</th>
+                  <th className="px-5 py-3 hidden xl:table-cell">Units</th>
                   <th className="px-5 py-3">Price</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3 text-right">Actions</th>
@@ -1221,6 +1332,13 @@ export default function AdminListingsPage() {
                           {l.construction_status.replace(/_/g, ' ')}
                         </span>
                       )}
+                    </td>
+
+                    {/* Units available */}
+                    <td className="px-5 py-3 hidden xl:table-cell">
+                      {l.units_available != null
+                        ? <p className="text-body-sm text-navy font-semibold">{l.units_available}</p>
+                        : <p className="text-caption text-subtle">—</p>}
                     </td>
 
                     {/* Price */}
