@@ -6,12 +6,15 @@ import { isAdminAuthed } from '@/lib/admin-auth'
  * POST /api/admin/enhance-image
  * Body: { imageUrl: string }
  *
- * Calls Gemini gemini-2.0-flash-preview-image-generation to enhance a
+ * Calls Gemini image model (configurable via GEMINI_IMAGE_MODEL) to enhance a
  * property photo. Returns { enhancedImageUrl: string } (base64 data URL).
  *
  * Non-destructive: the original is never modified; the caller chooses whether
  * to replace it.
  */
+
+
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview'
 
 const ENHANCE_PROMPT =
   'Enhance this property photo: improve lighting, clarity, and visual appeal ' +
@@ -54,7 +57,7 @@ export async function POST(req: Request) {
 
     const genai = new GoogleGenerativeAI(apiKey)
     const model = genai.getGenerativeModel({
-      model: 'gemini-3.1-flash-image-preview',
+      model: IMAGE_MODEL,
     })
 
     const result = await model.generateContent([
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
         {
           error:
             'Gemini did not return an enhanced image. ' +
-            'Ensure the flash-preview-image-generation model is available for your API key.',
+            `Ensure the configured image model (${IMAGE_MODEL}) is available for your API key.`,
         },
         { status: 502 },
       )
