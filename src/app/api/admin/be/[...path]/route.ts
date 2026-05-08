@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isAdminAuthed } from '@/lib/admin-auth'
 import { beFetch, ApiError } from '@/lib/api'
-import { normalizeListingTypeForDb } from '@/lib/listing-type'
+import { normalizeListingType } from '@/lib/listing-type'
 
 /**
  * Proxy: /api/admin/be/* → propabridge-backend api-gateway /*
@@ -14,7 +14,7 @@ import { normalizeListingTypeForDb } from '@/lib/listing-type'
 
 /**
  * Coalesce `listing_type` + `transaction_type` and normalize before forwarding.
- * Matches api-gateway `normalizeListingType` + migration 022 CHECK tokens.
+ * Emit only `sale` | `rent` so older DB constraints never reject PATCH bodies.
  */
 function normalizeForwardedListingBody(bodyText: string, pathJoined: string): string {
   const root = pathJoined.split('/')[0]
@@ -23,17 +23,23 @@ function normalizeForwardedListingBody(bodyText: string, pathJoined: string): st
     const obj = JSON.parse(bodyText) as Record<string, unknown>
     if (!('listing_type' in obj) && !('transaction_type' in obj)) return bodyText
 
-    const coalesced = obj.listing_type || obj.transaction_type
-    const norm = normalizeListingTypeForDb(
-      coalesced !== undefined && coalesced !== null ? String(coalesced) : null,
+    const coalesced = obj.listing_type ?? obj.transaction_type
+    obj.listing_type = normalizeListingType(
+      coalesced !== undefined && coalesced !== null ? String(coalesced) : undefined,
     )
-    if (norm !== null) obj.listing_type = norm
-    else delete obj.listing_type
     delete obj.transaction_type
     return JSON.stringify(obj)
   } catch {
     return bodyText
   }
+}
+
+/** Older dashboards called `/api/admin/be/admin/properties/…` — strip duplicate `admin`. */
+function rewriteBackendSegments(segments: string[]): string[] {
+  if (segments.length >= 2 && segments[0] === 'admin' && segments[1] === 'properties') {
+    return segments.slice(1)
+  }
+  return segments
 }
 
 async function handle(
@@ -45,7 +51,9 @@ async function handle(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const { search } = new URL(req.url)
-  const target = `/${ctx.params.path.join('/')}${search}`
+  const segments = rewriteBackendSegments(ctx.params.path)
+  const pathJoined = segments.join('/')
+  const target = `/${pathJoined}${search}`
 
   const init: RequestInit = { method }
   if (method !== 'GET' && method !== 'DELETE') {
@@ -53,7 +61,7 @@ async function handle(
     if (body) {
       init.body =
         method === 'POST' || method === 'PATCH' || method === 'PUT'
-          ? normalizeForwardedListingBody(body, ctx.params.path.join('/'))
+          ? normalizeForwardedListingBody(body, pathJoined)
           : body
     }
   }
@@ -70,6 +78,19 @@ async function handle(
       if (msg.includes('Cannot GET') || msg.trimStart().startsWith('<')) {
         return NextResponse.json({ items: [], data: [], neighborhoods: [], total: 0 })
       }
+    }
+    // Best-effort embedding refresh after AI rewrite — older api-gateway revisions 404 here.
+    // Same-origin XHR still shows as "CORS/type" noise in devtools when status is 4xx; return 200.
+    if (
+      method === 'POST' &&
+      err.status === 404 &&
+      /^properties\/[^/]+\/embed$/.test(pathJoined)
+    ) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        message: 'Upstream embedding route unavailable; listing save is unaffected.',
+      })
     }
     return NextResponse.json(
       { error: err.message || 'Upstream error' },
