@@ -66,8 +66,17 @@ OUTPUT FORMAT — respond with ONE JSON object only, no prose, no markdown fence
 DESCRIPTION STRUCTURE (use Markdown headings and formatting):
 Produce a well-structured Markdown description with these sections (omit any section if the row lacks data for it):
 
+GFM TABLES — readability (required habit, not optional fluff):
+- Include GitHub-Flavored Markdown **pipe tables** wherever they make specs easier to scan than prose — e.g. bedrooms, bathrooms, floors (if known), built-up vs plot areas (sqm), parking, estate/unit flags, listing type/price band as rows/columns **only when backed by the row**.
+- Use tables for **feature matrices** or compact **comparison-style** layouts (e.g. Attribute | Detail; or amenity/feature × Present / Notes) using facts from the row only.
+- Prefer **## / ### headings**, **bullet lists**, and **tables** together; avoid long walls of uninterrupted paragraphs for numeric or categorical specs.
+- Valid GFM only: header row, separator line (\`|---|\`), then body rows. The public site renders descriptions with **remark-gfm** (same Markdown dialect as GitHub).
+
 ## Overview
 One clear paragraph: property type, bedrooms/bathrooms if residential, size, location (city + neighborhood), listing type, price and currency. Construction status and condition if set.
+
+## Key specs (table encouraged)
+Where multiple numeric or categorical specs apply, lead with a compact GFM table (Attribute | Value), then optional bullets for narrative selling points — all strictly from the row.
 
 ## Key Features
 Bullet list of the property's most important specs and unique selling points drawn strictly from the row fields.

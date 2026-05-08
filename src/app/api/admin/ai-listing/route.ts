@@ -139,13 +139,14 @@ ${facts}
 Your task:
 1. Write a polished, compelling property description in **Markdown format** using these sections:
    ## Overview — property type, bedrooms/bathrooms, size, location, listing type, price
+   ## Key specs — include at least one **GitHub-Flavored Markdown pipe table** when multiple specs apply (bedrooms, baths, floors if given, built-up/plot sqm, parking, etc.); use tables for feature matrices or Attribute | Detail comparisons; only facts from the inputs below
    ## Key Features — bullet list of standout specs and selling points
    ## Location Highlights — neighborhood or city context
    ## Investment Potential — (only for sale/off-plan) why this is a strong investment
    ## Amenities — bullet list from the amenities provided (omit if none)
    ## Units Available — (only if units_available is set) state remaining units
    
-   Reference the title type, payment plan, utilities, construction status throughout where present. Write for discerning Nigerian buyers and diaspora investors. Total length: 250–450 words.
+   Formatting: prefer ## headings, bullet lists, **GFM tables** (header row + \`|---|\` separator + body rows) over dense prose for specs — the public site renders with **remark-gfm**. Reference the title type, payment plan, utilities, construction status throughout where present. Write for discerning Nigerian buyers and diaspora investors. Total length: 250–450 words.
 
 2. After the description, output a JSON block with suggested structured fields. Infer the city if not explicitly given. Generate a URL-friendly slug from the title (lowercase, hyphens, no special chars). Use these exact keys.
 
