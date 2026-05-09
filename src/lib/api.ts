@@ -16,8 +16,19 @@ export class ApiError extends Error {
   }
 }
 
-const ADK_BASE = process.env.PROPA_ADK_BASE || ''
-const BE_BASE = process.env.PROPA_BACKEND_BASE || ''
+/** Strip trailing slashes and accidental `/api` or `/api/admin` so paths like `/api/admin/...` are not doubled. */
+function normalizeAdkBase(raw: string): string {
+  let b = raw.trim()
+  if (!b) return b
+  b = b.replace(/\/+$/, '')
+  if (b.endsWith('/api/admin')) b = b.slice(0, -'/api/admin'.length)
+  else if (b.endsWith('/api')) b = b.slice(0, -'/api'.length)
+  return b
+}
+
+const ADK_BASE = normalizeAdkBase(process.env.PROPA_ADK_BASE || '')
+/** Backend proxy uses paths like `/listings` (no /api prefix); only trim slashes here. */
+const BE_BASE = (process.env.PROPA_BACKEND_BASE || '').trim().replace(/\/+$/, '')
 
 async function rawFetch<T>(
   base: string,
