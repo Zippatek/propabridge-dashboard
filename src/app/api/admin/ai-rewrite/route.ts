@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { isAdminAuthed } from '@/lib/admin-auth'
 import { beFetch, ApiError } from '@/lib/api'
 
@@ -17,7 +16,101 @@ import { beFetch, ApiError } from '@/lib/api'
  * the listing itself via /api/admin/be/listings/:id when the admin accepts.
  */
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const GEMINI_REST_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+
+function getGeminiApiKey(): string {
+  return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim()
+}
+
+function geminiAiRewriteModel(): string {
+  return String(process.env.GEMINI_AI_REWRITE_MODEL || '').trim() || 'gemini-2.5-flash'
+}
+
+/**
+ * Strip common ``` / ```json fences around model output before JSON.parse.
+ */
+function stripModelJsonFences(raw: string): string {
+  let t = String(raw || '').trim()
+  if (!t.startsWith('```')) return t
+  t = t.replace(/^```(?:json|JSON)?\s*\r?\n?/, '')
+  const close = t.lastIndexOf('```')
+  if (close !== -1) t = t.slice(0, close)
+  return t.trim()
+}
+
+/**
+ * Pull first top-level `{ ... }` block from normalized text (handles minor fence noise).
+ */
+function extractJsonObjectString(text: string): string | null {
+  const cleaned = stripModelJsonFences(text)
+  const m = cleaned.match(/\{[\s\S]*\}/)
+  return m ? m[0] : null
+}
+
+function geminiResponseText(respJson: {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+}): string {
+  const parts = respJson?.candidates?.[0]?.content?.parts
+  if (!Array.isArray(parts)) return ''
+  return parts.map(p => (p && typeof p.text === 'string' ? p.text : '')).join('').trim()
+}
+
+async function geminiGenerateContent({
+  model,
+  systemInstruction,
+  userText,
+  maxOutputTokens,
+}: {
+  model: string
+  systemInstruction: string
+  userText: string
+  maxOutputTokens: number
+}): Promise<
+  | { ok: true; text: string }
+  | { ok: false; status: number; bodyText: string; error?: string }
+> {
+  const apiKey = getGeminiApiKey()
+  if (!apiKey) {
+    return { ok: false, status: 0, bodyText: '', error: 'no_api_key' }
+  }
+  const url = `${GEMINI_REST_BASE}/${encodeURIComponent(model)}:generateContent`
+  const body = {
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    contents: [{ role: 'user', parts: [{ text: userText }] }],
+    generationConfig: {
+      maxOutputTokens,
+      responseMimeType: 'application/json',
+    },
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(body),
+    })
+    const bodyText = await res.text().catch(() => '')
+    if (!res.ok) {
+      return { ok: false, status: res.status, bodyText }
+    }
+    let json: unknown
+    try {
+      json = JSON.parse(bodyText)
+    } catch {
+      return { ok: false, status: res.status, bodyText: 'Invalid JSON from Gemini' }
+    }
+    const text = geminiResponseText(json as Parameters<typeof geminiResponseText>[0])
+    if (!text) {
+      return { ok: false, status: res.status, bodyText: bodyText.slice(0, 400) }
+    }
+    return { ok: true, text }
+  } catch (e) {
+    const err = e as Error
+    return { ok: false, status: 0, bodyText: err.message || String(e) }
+  }
+}
 
 interface PropertyRow {
   id?: string | number
@@ -186,9 +279,6 @@ export async function POST(req: Request) {
   if (!isAdminAuthed()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
-  }
 
   let body: { propertyId?: string; listingId?: string; property?: PropertyRow }
   try {
@@ -211,28 +301,57 @@ export async function POST(req: Request) {
     }
   }
 
-  try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1500,
-      system: SYSTEM,
-      messages: [{ role: 'user', content: buildUserPrompt(property) }],
-    })
-    const text = message.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
-      .trim()
+  const apiKey = getGeminiApiKey()
+  if (!apiKey) {
+    const msg =
+      'Gemini API key is not configured on the server. Set GEMINI_API_KEY or GOOGLE_API_KEY for listing rewrites.'
+    return NextResponse.json({ error: msg, message: msg }, { status: 503 })
+  }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return NextResponse.json({ error: 'AI response did not contain JSON', raw: text }, { status: 500 })
+  try {
+    const gen = await geminiGenerateContent({
+      model: geminiAiRewriteModel(),
+      systemInstruction: SYSTEM,
+      userText: buildUserPrompt(property),
+      maxOutputTokens: 8192,
+    })
+
+    if (!gen.ok) {
+      if (gen.error === 'no_api_key') {
+        const msg =
+          'Gemini API key is not configured on the server. Set GEMINI_API_KEY or GOOGLE_API_KEY for listing rewrites.'
+        return NextResponse.json({ error: msg, message: msg }, { status: 503 })
+      }
+      const upstream =
+        gen.status === 429 || gen.status === 503
+          ? 503
+          : gen.status === 0 || gen.status >= 500
+            ? 502
+            : 502
+      const readable =
+        gen.status === 0
+          ? 'Could not reach the Gemini API from the server.'
+          : `Gemini returned an error (HTTP ${gen.status}). Try again shortly.`
+      return NextResponse.json(
+        {
+          error: readable,
+          message: readable,
+        },
+        { status: upstream },
+      )
+    }
+
+    const jsonSlice = extractJsonObjectString(gen.text)
+    if (!jsonSlice) {
+      const msg = 'AI response did not contain usable JSON.'
+      return NextResponse.json({ error: msg, message: msg, raw: gen.text.slice(0, 2000) }, { status: 502 })
     }
     let parsed: RewriteResult
     try {
-      parsed = JSON.parse(jsonMatch[0])
+      parsed = JSON.parse(jsonSlice)
     } catch {
-      return NextResponse.json({ error: 'Could not parse AI JSON', raw: text }, { status: 500 })
+      const msg = 'Could not parse AI JSON output.'
+      return NextResponse.json({ error: msg, message: msg, raw: jsonSlice.slice(0, 2000) }, { status: 502 })
     }
     const out: RewriteResult = {
       description: String(parsed.description || '').trim(),
@@ -252,6 +371,7 @@ export async function POST(req: Request) {
     })
   } catch (e) {
     const err = e as Error
-    return NextResponse.json({ error: err.message || 'AI generation failed' }, { status: 500 })
+    const msg = err.message || 'AI generation failed'
+    return NextResponse.json({ error: msg, message: msg }, { status: 500 })
   }
 }
