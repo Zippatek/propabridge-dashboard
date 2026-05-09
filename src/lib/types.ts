@@ -50,9 +50,15 @@ export interface AdkLead {
 }
 
 export interface TranscriptTurn {
-  author: 'user' | 'assistant'
+  author: 'user' | 'assistant' | 'agent'
   content: string
   timestamp: string | null
+}
+
+export interface TakeoverStatus {
+  is_taken_over: boolean
+  taken_over_by?: string | null
+  taken_over_at?: string | null
 }
 
 export interface ConversationDetail {
