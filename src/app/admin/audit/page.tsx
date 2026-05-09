@@ -31,6 +31,7 @@ interface AutofixPreviewPayload {
   before: Record<string, unknown>
   patchedFields: string[]
   skipped: { field: string; reason: string }[]
+  anthropicUnavailable?: { message: string; providerDetail?: string }
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -45,6 +46,8 @@ const SEV_ICON = {
 }
 
 /** Fields the backend auto-fix whitelist allows */
+const ANTHROPIC_PLANS_URL = 'https://console.anthropic.com/settings/plans'
+
 const AUTOFIXABLE_FIELDS = new Set([
   'city',
   'property_type',
@@ -53,7 +56,45 @@ const AUTOFIXABLE_FIELDS = new Set([
   'summary',
   'search_keywords',
   'slug',
+  'neighborhood',
 ])
+
+interface AutofixApiResponse {
+  proposed?: Record<string, unknown>
+  before?: Record<string, unknown>
+  patchedFields?: string[]
+  skipped?: { field: string; reason: string }[]
+  dryRun?: boolean
+  applied?: boolean
+  error?: string
+  message?: string
+  provider_detail?: unknown
+  note?: string
+}
+
+async function postPropertyAutofix(
+  body: Record<string, unknown>,
+): Promise<{ status: number; data: AutofixApiResponse }> {
+  const res = await fetch(`/api/admin/be/admin/property-audit/autofix`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = (await res.json().catch(() => ({}))) as AutofixApiResponse
+  const recoverable =
+    data.error === 'anthropic_unavailable' && (res.status === 200 || res.status === 422)
+  if (!res.ok && !recoverable) {
+    const msg =
+      typeof data.error === 'string'
+        ? data.error
+        : typeof data.message === 'string'
+          ? data.message
+          : `Request failed (${res.status})`
+    throw new Error(msg)
+  }
+  return { status: res.status, data }
+}
 
 function formatFieldValue(v: unknown): string {
   if (v === null || v === undefined) return '—'
@@ -73,6 +114,7 @@ export default function AdminAuditPage() {
   const [preview, setPreview] = useState<AutofixPreviewPayload | null>(null)
   const [applyLoading, setApplyLoading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [billingBanner, setBillingBanner] = useState<string | null>(null)
 
   const load = useCallback(async (sev: string) => {
     setError(null)
@@ -100,27 +142,32 @@ export default function AdminAuditPage() {
     const loadKey = `${propertyId}:${issueIds?.join(',') ?? 'all'}`
     setAutofixLoading(loadKey)
     setNotice(null)
+    setBillingBanner(null)
     setError(null)
     try {
-      const res = await be.send<{
-        proposed: Record<string, unknown>
-        before: Record<string, unknown>
-        patchedFields: string[]
-        skipped: { field: string; reason: string }[]
-        dryRun?: boolean
-      }>('/admin/property-audit/autofix', 'POST', {
+      const { data } = await postPropertyAutofix({
         propertyId,
         issueIds: issueIds ?? undefined,
         dryRun: true,
       })
+      const detail =
+        data.provider_detail !== undefined && data.provider_detail !== null
+          ? typeof data.provider_detail === 'string'
+            ? data.provider_detail
+            : JSON.stringify(data.provider_detail)
+          : undefined
       setPreview({
         propertyId,
         auditRowId,
         issueIds,
-        proposed: res.proposed || {},
-        before: res.before || {},
-        patchedFields: res.patchedFields || [],
-        skipped: res.skipped || [],
+        proposed: data.proposed || {},
+        before: data.before || {},
+        patchedFields: data.patchedFields || [],
+        skipped: data.skipped || [],
+        anthropicUnavailable:
+          data.error === 'anthropic_unavailable'
+            ? { message: data.message || 'Anthropic is unavailable.', providerDetail: detail }
+            : undefined,
       })
     } catch (e) {
       setError((e as Error).message)
@@ -133,23 +180,23 @@ export default function AdminAuditPage() {
     if (!preview) return
     setApplyLoading(true)
     setNotice(null)
+    setBillingBanner(null)
     setError(null)
     try {
-      const res = await be.send<{ applied: boolean; patchedFields?: string[] }>(
-        '/admin/property-audit/autofix',
-        'POST',
-        {
-          propertyId: preview.propertyId,
-          issueIds: preview.issueIds ?? undefined,
-          dryRun: false,
-        },
-      )
+      const { data } = await postPropertyAutofix({
+        propertyId: preview.propertyId,
+        issueIds: preview.issueIds ?? undefined,
+        dryRun: false,
+      })
       setPreview(null)
       setNotice(
-        res.applied
-          ? `Applied updates: ${(res.patchedFields || []).join(', ') || 'none'}.`
+        data.applied
+          ? `Applied updates: ${(data.patchedFields || []).join(', ') || 'none'}.`
           : 'No changes applied.',
       )
+      if (data.error === 'anthropic_unavailable') {
+        setBillingBanner(data.message || 'Anthropic is unavailable; only rule-based fixes were applied.')
+      }
       await load(severityFilter)
     } catch (e) {
       setError((e as Error).message)
@@ -204,6 +251,19 @@ export default function AdminAuditPage() {
       {notice && (
         <div className="bg-action-light border border-action/20 text-action text-body-sm rounded-card px-4 py-2.5">
           {notice}
+        </div>
+      )}
+      {billingBanner && (
+        <div className="bg-orange-50 border border-orange-200 text-orange-900 text-body-sm rounded-card px-4 py-2.5 space-y-1">
+          <p>{billingBanner}</p>
+          <a
+            href={ANTHROPIC_PLANS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-action hover:underline"
+          >
+            Plans &amp; Billing (Anthropic) <ExternalLink size={12} />
+          </a>
         </div>
       )}
       {error && (
@@ -335,7 +395,7 @@ export default function AdminAuditPage() {
             <div className="px-5 py-4 border-b border-divider flex items-start justify-between gap-3">
               <div>
                 <h2 id="autofix-preview-title" className="text-body font-semibold text-navy">
-                  Review AI suggestions
+                  {preview.anthropicUnavailable ? 'Review suggested fixes' : 'Review AI suggestions'}
                 </h2>
                 <p className="text-caption text-subtle mt-0.5">
                   Property <code className="text-[11px] bg-beige px-1 rounded">{preview.propertyId}</code>
@@ -350,6 +410,25 @@ export default function AdminAuditPage() {
               </button>
             </div>
             <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+              {preview.anthropicUnavailable && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-body-sm text-orange-950 space-y-1.5">
+                  <p className="font-semibold text-navy">AI suggestions unavailable</p>
+                  <p>{preview.anthropicUnavailable.message}</p>
+                  {preview.anthropicUnavailable.providerDetail && (
+                    <p className="text-caption text-subtle break-words">
+                      {preview.anthropicUnavailable.providerDetail}
+                    </p>
+                  )}
+                  <a
+                    href={ANTHROPIC_PLANS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-action hover:underline"
+                  >
+                    Plans &amp; Billing (Anthropic) <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
               {preview.patchedFields.length === 0 && (
                 <p className="text-body-sm text-subtle">
                   No field changes proposed. You can still review skipped items below.
