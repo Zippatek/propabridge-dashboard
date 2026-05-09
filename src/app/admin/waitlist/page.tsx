@@ -35,6 +35,30 @@ function budgetLabel(lead: AdkLead): string {
   return '—'
 }
 
+function waitlistCriteriaSnippet(lead: AdkLead): string {
+  const wc = lead.waitlist_criteria as Record<string, unknown> | undefined | null
+  if (wc && typeof wc === 'object') {
+    const latest = wc.latest_promise_backfill as Record<string, unknown> | undefined
+    const lt = latest?.promise_text as string | undefined
+    const pt = wc.promise_text as string | undefined
+    const blob = lt || pt
+    if (blob && typeof blob === 'string') return blob.replace(/\s+/g, ' ').slice(0, 140)
+  }
+  const notes = typeof lead.notes === 'string' ? lead.notes.trim() : ''
+  if (notes && notes.startsWith('[waitlist/')) {
+    const rest = notes.split('\n')[0]?.replace(/^\[[^\]]+\]\s*/, '') ?? ''
+    return rest.slice(0, 140)
+  }
+  return '—'
+}
+
+function waitlistSourceLabel(lead: AdkLead): string {
+  const pid = lead.waitlist_source_promise_id
+  if (pid && typeof pid === 'string') return pid.length > 16 ? `promise ${pid.slice(0, 14)}…` : `promise ${pid}`
+  if (lead.session_id) return 'chat'
+  return '—'
+}
+
 export default function AdminWaitlistPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [leads, setLeads] = useState<AdkLead[] | null>(null)
@@ -138,8 +162,11 @@ export default function AdminWaitlistPage() {
                   <th className="px-6 py-3">Lead</th>
                   <th className="px-6 py-3">Looking for</th>
                   <th className="px-6 py-3">Budget</th>
+                  <th className="px-6 py-3">Source</th>
+                  <th className="px-6 py-3">Criteria</th>
                   <th className="px-6 py-3">Score</th>
                   <th className="px-6 py-3">Captured</th>
+                  <th className="px-6 py-3">Match alert</th>
                   <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -183,6 +210,12 @@ export default function AdminWaitlistPage() {
                     <td className="px-6 py-4 text-body-sm text-navy">
                       {budgetLabel(lead)}
                     </td>
+                    <td className="px-6 py-4 text-caption text-subtle capitalize">
+                      {waitlistSourceLabel(lead)}
+                    </td>
+                    <td className="px-6 py-4 text-caption text-subtle max-w-[14rem] truncate" title={waitlistCriteriaSnippet(lead)}>
+                      {waitlistCriteriaSnippet(lead)}
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-block px-2.5 py-1 rounded text-caption font-bold ${scoreClass(lead.score)}`}
@@ -192,6 +225,11 @@ export default function AdminWaitlistPage() {
                     </td>
                     <td className="px-6 py-4 text-caption text-subtle">
                       {formatRelativeTime(lead.created_at)}
+                    </td>
+                    <td className="px-6 py-4 text-caption text-subtle whitespace-nowrap">
+                      {lead.last_waitlist_notify_at
+                        ? formatRelativeTime(lead.last_waitlist_notify_at)
+                        : '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Link
