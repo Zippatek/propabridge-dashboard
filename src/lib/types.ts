@@ -43,6 +43,10 @@ export interface AdkLead {
   bedrooms?: number | null
   timeline?: string | null
   notes?: string | null
+  /** Populated when the row was seeded from ai_promises backfill */
+  waitlist_source_promise_id?: string | null
+  waitlist_criteria?: Record<string, unknown> | null
+  last_waitlist_notify_at?: string | null
   created_at?: string | null
   updated_at?: string | null
   whatsapp_sent?: boolean | null
