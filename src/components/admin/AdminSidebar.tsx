@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   Bot,
   List,
+  ListChecks,
   Newspaper,
   MapPin,
 } from 'lucide-react'
@@ -48,6 +49,7 @@ const sections: Array<{
     items: [
       { icon: MessageSquare, label: 'Conversations', href: '/admin/conversations' },
       { icon: Flame, label: 'Leads', href: '/admin/leads' },
+      { icon: ListChecks, label: 'Waitlist', href: '/admin/waitlist' },
       { icon: AlertTriangle, label: 'Promises / Escalations', href: '/admin/promises' },
       { icon: ShieldAlert, label: 'Data Quality Audit', href: '/admin/audit' },
       { icon: Bot, label: 'AI Agents', href: '/admin/ai-agents' },
