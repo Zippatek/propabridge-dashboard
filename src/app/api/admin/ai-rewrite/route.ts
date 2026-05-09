@@ -40,6 +40,7 @@ interface PropertyRow {
   construction_status?: string | null
   condition?: string | null
   payment_plan?: string | null
+  title_type?: string | null
   power_supply?: string | null
   water_supply?: string | null
   road_access?: string | null
@@ -72,6 +73,9 @@ GFM TABLES — readability (required habit, not optional fluff):
 - Prefer **## / ### headings**, **bullet lists**, and **tables** together; avoid long walls of uninterrupted paragraphs for numeric or categorical specs.
 - Valid GFM only: header row, separator line (\`|---|\`), then body rows. The public site renders descriptions with **remark-gfm** (same Markdown dialect as GitHub).
 
+LEGAL HEADINGS — required:
+- In every \`##\` / \`###\` heading and in first mentions in prose, use **full formal English** for legal title types — e.g. "Certificate of Occupancy", "Right of Occupancy", "Governor's Consent", "Deed of Assignment", "Allocation letter". Do **not** use internal codes (\`c_of_o\`, \`r_of_o\`, etc.), slug-style tokens, or sloppy abbreviations like "C of O" / "c of o" / "R of O" **in any heading**. After the full term appears once, shorter references like "the title" or "the certificate" are fine.
+
 ## Overview
 One clear paragraph: property type, bedrooms/bathrooms if residential, size, location (city + neighborhood), listing type, price and currency. Construction status and condition if set.
 
@@ -95,6 +99,32 @@ Only include if units_available is set and greater than 0. State the number of u
 
 Keep the full description between 200–400 words.`
 
+function humanTitleType(raw: string | null | undefined): string | undefined {
+  if (!raw?.trim()) return undefined
+  const t = raw.trim().toLowerCase().replace(/\s+/g, '_')
+  const map: Record<string, string> = {
+    c_of_o: 'Certificate of Occupancy',
+    r_of_o: 'Right of Occupancy',
+    governors_consent: "Governor's Consent",
+    deed_of_assignment: 'Deed of Assignment',
+    customary: 'Customary title',
+    allocation_letter: 'Allocation letter',
+  }
+  return map[t] ?? raw.trim()
+}
+
+function humanPaymentPlan(raw: string | null | undefined): string | undefined {
+  if (!raw?.trim()) return undefined
+  const t = raw.trim().toLowerCase()
+  const map: Record<string, string> = {
+    outright: 'Outright purchase',
+    installment: 'Installment payment',
+    mortgage: 'Mortgage',
+    off_plan_milestones: 'Off-plan milestone payments',
+  }
+  return map[t] ?? raw.trim().replace(/_/g, ' ')
+}
+
 function buildUserPrompt(p: PropertyRow): string {
   const line = (k: string, v: unknown) =>
     v === undefined || v === null || v === '' ? null : `- ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`
@@ -114,7 +144,8 @@ function buildUserPrompt(p: PropertyRow): string {
     line('declared_plot_size_sqm', p.declared_plot_size_sqm),
     line('price', p.price),
     line('currency', p.currency || 'NGN'),
-    line('payment_plan', p.payment_plan),
+    line('payment_plan', humanPaymentPlan(p.payment_plan)),
+    line('title_type', humanTitleType(p.title_type)),
     line('construction_status', p.construction_status),
     line('condition', p.condition),
     line('power_supply', p.power_supply),
