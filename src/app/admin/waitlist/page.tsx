@@ -21,6 +21,7 @@ import { ListChecks, MessageSquare, Phone, Mail } from 'lucide-react'
 import type { AdkLead, WaitlistCandidate } from '@/lib/types'
 import { adk } from '@/lib/client-api'
 import { scoreClass, formatRelativeTime, formatNaira } from '@/lib/format'
+import { displayLeadLabel } from '@/lib/display-name'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 
 type Tab = 'all' | 'likely' | 'rent' | 'buy' | 'invest'
@@ -71,10 +72,15 @@ export default function AdminWaitlistPage() {
   )
   const [candidateDays] = useState(30)
   const [promotingId, setPromotingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
 
   useEffect(() => {
-    setError(null)
+    setPageError(null)
+    setToast(null)
     if (tab === 'likely') {
       setLeads(null)
       setCandidates(null)
@@ -86,21 +92,21 @@ export default function AdminWaitlistPage() {
           `/leads/waitlist-candidates?days=${encodeURIComponent(String(candidateDays))}`,
         )
         .then((d) => setCandidates(d.items || []))
-        .catch((e) => setError((e as Error).message))
+        .catch((e) => setPageError((e as Error).message))
       return
     }
     setCandidates(null)
     setLeads(null)
     const params = new URLSearchParams()
     params.set('status', 'waitlisted')
-    params.set('min_score', '0') // waitlisted leads are pre-conversion; do not score-gate
+    params.set('min_score', '0') // aligns with ADK: explicit 0 skips funnel default (80)
     params.set('limit', '200')
     if (tab !== 'all') params.set('intent', tab)
 
     adk
       .get<{ items: AdkLead[] }>(`/leads?${params}`)
       .then((d) => setLeads(d.items || []))
-      .catch((e) => setError((e as Error).message))
+      .catch((e) => setPageError((e as Error).message))
   }, [tab, candidateDays])
 
   const counts = useMemo(() => {
@@ -116,22 +122,33 @@ export default function AdminWaitlistPage() {
 
   async function promoteOne(sessionId: string) {
     setPromotingId(sessionId)
-    setError(null)
+    setToast(null)
     try {
       await adk.send(`/leads/promote-waitlist-candidates`, 'POST', {
         session_ids: [sessionId],
       })
-      setCandidates((prev) =>
-        prev ? prev.filter((c) => c.session_id !== sessionId) : prev,
-      )
+      setToast({
+        type: 'success',
+        message: 'Promoted to waitlist. Refreshed Likely list and confirmed queue.',
+      })
+      const [candRefresh, _waitlistedRefetch] = await Promise.all([
+        adk.get<{ items: WaitlistCandidate[] }>(
+          `/leads/waitlist-candidates?days=${encodeURIComponent(String(candidateDays))}`,
+        ),
+        adk.get<{ items: AdkLead[] }>(
+          `/leads?status=waitlisted&min_score=0&limit=200`,
+        ),
+      ])
+      void _waitlistedRefetch
+      setCandidates(candRefresh.items || [])
     } catch (e) {
-      setError((e as Error).message)
+      setToast({ type: 'error', message: (e as Error).message })
     } finally {
       setPromotingId(null)
     }
   }
 
-  if (error) return <PageError message={error} />
+  if (pageError) return <PageError message={pageError} />
 
   return (
     <div className="space-y-6">
@@ -162,6 +179,28 @@ export default function AdminWaitlistPage() {
           </span>
         )}
       </div>
+
+      {toast ? (
+        <div
+          role="status"
+          className={`rounded-lg border px-4 py-3 text-body-sm ${
+            toast.type === 'success'
+              ? 'bg-green-50 border-green-200 text-green-900'
+              : 'bg-red-50 border-red-200 text-red-900'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <span>{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="text-caption font-semibold opacity-70 hover:opacity-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex gap-1 bg-beige rounded-lg p-1 w-fit border border-divider">
         {TABS.map((t) => {
@@ -231,7 +270,10 @@ export default function AdminWaitlistPage() {
                   >
                     <td className="px-6 py-4">
                       <p className="font-semibold text-navy">
-                        {c.lead_name || 'Unknown'}
+                        {displayLeadLabel({
+                          name: c.lead_name,
+                          phone: c.phone,
+                        })}
                       </p>
                       <p className="text-caption text-subtle flex items-center gap-1 mt-0.5">
                         {c.phone ? (
@@ -332,7 +374,7 @@ export default function AdminWaitlistPage() {
                   >
                     <td className="px-6 py-4">
                       <p className="font-semibold text-navy">
-                        {lead.name || 'Anonymous'}
+                        {displayLeadLabel(lead)}
                       </p>
                       <p className="text-caption text-subtle flex items-center gap-2 mt-0.5">
                         {lead.phone ? (

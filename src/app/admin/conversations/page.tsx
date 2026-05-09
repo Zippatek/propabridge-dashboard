@@ -23,6 +23,7 @@ import type {
 } from '@/lib/types'
 import { adk } from '@/lib/client-api'
 import { formatRelativeTime, formatDateTime, scoreClass } from '@/lib/format'
+import { displayLeadLabel } from '@/lib/display-name'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PageError } from '@/components/admin/AsyncBoundary'
 
@@ -369,6 +370,11 @@ function ConversationsView() {
   const takeoverSince =
     takeoverStatus?.taken_over_at ?? takeoverStatus?.updated_at ?? null
 
+  const leadPhoneLabel =
+    detail?.lead?.phone?.startsWith('web:') === true
+      ? 'Web visitor'
+      : detail?.lead?.phone || '—'
+
   useEffect(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight
@@ -466,7 +472,7 @@ function ConversationsView() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-semibold text-navy text-body-sm truncate">
-                      {s.name || 'Guest User'}
+                      {displayLeadLabel(s)}
                     </p>
                     <span className="text-caption text-subtle whitespace-nowrap flex-shrink-0">
                       {formatRelativeTime(s.updated_at)}
@@ -502,7 +508,7 @@ function ConversationsView() {
             <header className="flex items-center justify-between px-6 py-4 border-b border-divider flex-shrink-0">
               <div className="min-w-0">
                 <h3 className="font-semibold text-navy truncate">
-                  {detail?.lead.name || 'Guest User'}
+                  {detail?.lead ? displayLeadLabel(detail.lead) : 'Unknown'}
                 </h3>
                 <p className="text-caption text-subtle truncate">ID: {selectedId}</p>
               </div>
@@ -687,8 +693,8 @@ function ConversationsView() {
                         onChange={(e) => setSendBody(e.target.value)}
                         placeholder={
                           isTakenOver
-                            ? `Reply as human agent to ${detail.lead.phone}`
-                            : `WhatsApp ${detail.lead.phone} as Propa`
+                            ? `Reply as human agent to ${leadPhoneLabel}`
+                            : `WhatsApp ${leadPhoneLabel} as Propa`
                         }
                         disabled={sending}
                         className={`flex-1 px-4 py-3 rounded-input border bg-white text-body-sm placeholder-placeholder focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 transition-all duration-200 ${
@@ -739,7 +745,7 @@ function ConversationsView() {
                       <p className="text-caption text-subtle">Phone</p>
                       <p className="text-navy flex items-center gap-1.5 mt-0.5">
                         <Phone size={14} strokeWidth={1.5} />
-                        {detail.lead.phone || '—'}
+                        {leadPhoneLabel}
                       </p>
                     </div>
                     <div>

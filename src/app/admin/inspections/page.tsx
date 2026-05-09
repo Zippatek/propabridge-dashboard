@@ -25,7 +25,9 @@ export default function AdminInspectionsPage() {
 
   const remind = async (id: string) => {
     try {
-      await be.send(`/scheduler/remind/${encodeURIComponent(id)}`, 'POST')
+      await be.send(`/scheduler/remind/${encodeURIComponent(id)}`, 'POST', {
+        type: 'reminder',
+      })
       alert('Reminder sent')
     } catch (e) {
       alert((e as Error).message)

@@ -20,6 +20,8 @@ export interface FunnelCounts {
 export interface SessionListItem {
   id: string
   name: string
+  full_name?: string | null
+  profile_name?: string | null
   phone: string | null
   email: string | null
   score: number | null
@@ -43,6 +45,8 @@ export interface AdkLead {
   id: string
   session_id?: string | null
   name?: string | null
+  full_name?: string | null
+  profile_name?: string | null
   phone?: string | null
   email?: string | null
   score?: number | null
