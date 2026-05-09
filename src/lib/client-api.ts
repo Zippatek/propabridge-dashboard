@@ -25,6 +25,23 @@ export const adk = {
       headers: body ? { 'content-type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     }).then(unwrap<T>),
+  /** Same-origin proxy; preserves HTTP status (unlike unwrap) for nuanced client handling */
+  fetchJson: async (path: string, init?: RequestInit) => {
+    const res = await fetch(`/api/admin/adk${path}`, {
+      credentials: 'same-origin',
+      ...init,
+    })
+    const text = await res.text()
+    let data: unknown = null
+    if (text) {
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = text
+      }
+    }
+    return { ok: res.ok, status: res.status, data }
+  },
 }
 
 export const be = {

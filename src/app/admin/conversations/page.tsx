@@ -174,7 +174,7 @@ function useSessionStream() {
 
 /* ─── SSE: conversation detail (with mock fallback) ──────────────────────── */
 
-function useConversationStream(sessionId: string | null) {
+function useConversationStream(sessionId: string | null, bump = 0) {
   const [detail, setDetail] = useState<ConversationDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const gotRealData = useRef(false)
@@ -229,7 +229,7 @@ function useConversationStream(sessionId: string | null) {
       clearTimeout(timeout)
       es.close()
     }
-  }, [sessionId])
+  }, [sessionId, bump])
 
   return { detail, error }
 }
@@ -239,20 +239,38 @@ function useConversationStream(sessionId: string | null) {
 function useTakeoverStatus(sessionId: string | null) {
   const [status, setStatus] = useState<TakeoverStatus | null>(null)
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!sessionId) {
       setStatus(null)
+      setFetchError(null)
       return
     }
+    setFetchError(null)
     try {
-      const data = await adk.get<TakeoverStatus>(
-        `/conversations/${encodeURIComponent(sessionId)}/takeover`,
+      const r = await adk.fetchJson(`/conversations/${encodeURIComponent(sessionId)}/takeover`)
+      if (r.ok && r.data && typeof r.data === 'object') {
+        const d = r.data as TakeoverStatus
+        setStatus({
+          ...d,
+          is_taken_over: !!(d.is_taken_over ?? d.active ?? false),
+        })
+        return
+      }
+      if (r.status === 404) {
+        setStatus({ is_taken_over: false })
+        return
+      }
+      setStatus(null)
+      const errBody =
+        typeof r.data === 'object' && r.data !== null ? (r.data as Record<string, unknown>) : null
+      setFetchError(
+        String(errBody?.error || errBody?.detail || `Request failed (${r.status})`),
       )
-      setStatus(data)
-    } catch {
-      // endpoint may not exist yet — default to not taken over
-      setStatus({ is_taken_over: false })
+    } catch (e) {
+      setStatus(null)
+      setFetchError((e as Error).message)
     }
   }, [sessionId])
 
@@ -263,16 +281,27 @@ function useTakeoverStatus(sessionId: string | null) {
   const takeover = async () => {
     if (!sessionId) return
     setLoading(true)
+    setFetchError(null)
     try {
-      const data = await adk.send<TakeoverStatus>(
-        `/conversations/${encodeURIComponent(sessionId)}/takeover`,
-        'POST',
-        { action: 'takeover' },
-      )
-      setStatus(data)
+      const r = await adk.fetchJson(`/conversations/${encodeURIComponent(sessionId)}/takeover`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ active: true }),
+      })
+      if (!r.ok) {
+        const errBody =
+          typeof r.data === 'object' && r.data !== null ? (r.data as Record<string, unknown>) : null
+        throw new Error(String(errBody?.error || errBody?.detail || `Request failed (${r.status})`))
+      }
+      if (r.data && typeof r.data === 'object') {
+        const d = r.data as TakeoverStatus
+        setStatus({
+          ...d,
+          is_taken_over: !!(d.is_taken_over ?? d.active ?? false),
+        })
+      }
     } catch (err) {
-      // If the endpoint doesn't exist, simulate local-only takeover
-      setStatus({ is_taken_over: true, taken_over_by: 'Admin', taken_over_at: new Date().toISOString() })
+      setFetchError((err as Error).message)
     } finally {
       setLoading(false)
     }
@@ -281,21 +310,33 @@ function useTakeoverStatus(sessionId: string | null) {
   const release = async () => {
     if (!sessionId) return
     setLoading(true)
+    setFetchError(null)
     try {
-      const data = await adk.send<TakeoverStatus>(
-        `/conversations/${encodeURIComponent(sessionId)}/takeover`,
-        'POST',
-        { action: 'release' },
-      )
-      setStatus(data)
-    } catch {
-      setStatus({ is_taken_over: false })
+      const r = await adk.fetchJson(`/conversations/${encodeURIComponent(sessionId)}/takeover`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ active: false }),
+      })
+      if (!r.ok) {
+        const errBody =
+          typeof r.data === 'object' && r.data !== null ? (r.data as Record<string, unknown>) : null
+        throw new Error(String(errBody?.error || errBody?.detail || `Request failed (${r.status})`))
+      }
+      if (r.data && typeof r.data === 'object') {
+        const d = r.data as TakeoverStatus
+        setStatus({
+          ...d,
+          is_taken_over: !!(d.is_taken_over ?? d.active ?? false),
+        })
+      }
+    } catch (err) {
+      setFetchError((err as Error).message)
     } finally {
       setLoading(false)
     }
   }
 
-  return { status, loading, takeover, release, refresh }
+  return { status, loading, takeover, release, refresh, fetchError }
 }
 
 /* ─── Main view ──────────────────────────────────────────────────────────── */
@@ -305,9 +346,16 @@ function ConversationsView() {
   const router = useRouter()
   const selectedId = search.get('id')
   const { items, error: listError } = useSessionStream()
-  const { detail } = useConversationStream(selectedId)
-  const { status: takeoverStatus, loading: takeoverLoading, takeover, release } =
-    useTakeoverStatus(selectedId)
+  const [conversationBump, setConversationBump] = useState(0)
+  const { detail } = useConversationStream(selectedId, conversationBump)
+  const {
+    status: takeoverStatus,
+    loading: takeoverLoading,
+    takeover,
+    release,
+    refresh: refreshTakeover,
+    fetchError: takeoverFetchError,
+  } = useTakeoverStatus(selectedId)
   const [filter, setFilter] = useState('')
   const [sendBody, setSendBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -315,7 +363,11 @@ function ConversationsView() {
   const messagesRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const isTakenOver = takeoverStatus?.is_taken_over ?? false
+  const isTakenOver =
+    !!(takeoverStatus?.is_taken_over ?? takeoverStatus?.active ?? false)
+
+  const takeoverSince =
+    takeoverStatus?.taken_over_at ?? takeoverStatus?.updated_at ?? null
 
   useEffect(() => {
     if (messagesRef.current) {
@@ -353,6 +405,8 @@ function ConversationsView() {
         as_agent: isTakenOver,
       })
       setSendBody('')
+      setConversationBump((b) => b + 1)
+      void refreshTakeover()
     } catch (err) {
       setSendError((err as Error).message)
     } finally {
@@ -454,6 +508,11 @@ function ConversationsView() {
               </div>
 
               <div className="flex items-center gap-3 flex-shrink-0">
+                {takeoverFetchError && (
+                  <p className="text-caption text-danger max-w-[12rem]" title={takeoverFetchError}>
+                    Takeover sync error
+                  </p>
+                )}
                 {detail?.lead.score != null && (
                   <span
                     className={`text-caption font-bold px-2.5 py-1 rounded ${scoreClass(detail.lead.score)}`}
@@ -507,9 +566,7 @@ function ConversationsView() {
                   </p>
                   <p className="text-caption text-[#7a5a10]">
                     AI is paused. Messages are sent as a human agent via WhatsApp.
-                    {takeoverStatus?.taken_over_at && (
-                      <> · Since {formatDateTime(takeoverStatus.taken_over_at)}</>
-                    )}
+                    {takeoverSince && <> · Since {formatDateTime(takeoverSince)}</>}
                   </p>
                 </div>
                 <button

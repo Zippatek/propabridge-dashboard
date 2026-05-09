@@ -61,8 +61,12 @@ export interface TranscriptTurn {
 
 export interface TakeoverStatus {
   is_taken_over: boolean
+  /** ADK synonym for `is_taken_over` */
+  active?: boolean
+  /** ISO takeover timestamp(s) — server may populate `updated_at` or `taken_over_at` */
   taken_over_by?: string | null
   taken_over_at?: string | null
+  updated_at?: string | null
 }
 
 export interface ConversationDetail {
