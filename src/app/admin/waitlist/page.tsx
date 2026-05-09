@@ -3,10 +3,13 @@
 /**
  * Waitlist queue — leads captured with status = "waitlisted".
  *
- * Drives ADK `GET /api/admin/leads?status=waitlisted&intent=…` (proxied via
- * `/api/admin/adk/...`).  Filters the canonical leads table; there is no
- * dedicated /waitlists endpoint — this matches the legacy ADK admin tab in
- * `static/admin.html` (`showWaitlist()` flips the lead status filter).
+ * Confirmed queue: ADK `GET /leads?status=waitlisted&intent=…` (via
+ * `/api/admin/adk/...`).
+ *
+ * **Likely (from chats)** is pre-waitlist: `GET /leads/waitlist-candidates` —
+ * heuristic signals only; promote sets `status=waitlisted` and
+ * `waitlist_source=chat_heuristic`. Older transcripts may lack user text in
+ * `events` — signals then lean on ai_promises and tool traces.
  *
  * Tabs split the queue by intent (rent / buy / invest) — the same axes the
  * agent uses to record lead requirements via `capture_lead`.
@@ -15,15 +18,16 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ListChecks, MessageSquare, Phone, Mail } from 'lucide-react'
-import type { AdkLead } from '@/lib/types'
+import type { AdkLead, WaitlistCandidate } from '@/lib/types'
 import { adk } from '@/lib/client-api'
 import { scoreClass, formatRelativeTime, formatNaira } from '@/lib/format'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 
-type Tab = 'all' | 'rent' | 'buy' | 'invest'
+type Tab = 'all' | 'likely' | 'rent' | 'buy' | 'invest'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'all', label: 'All' },
+  { id: 'likely', label: 'Likely (from chats)' },
   { id: 'rent', label: 'Rent' },
   { id: 'buy', label: 'Buy' },
   { id: 'invest', label: 'Invest' },
@@ -62,11 +66,31 @@ function waitlistSourceLabel(lead: AdkLead): string {
 export default function AdminWaitlistPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [leads, setLeads] = useState<AdkLead[] | null>(null)
+  const [candidates, setCandidates] = useState<WaitlistCandidate[] | null>(
+    null,
+  )
+  const [candidateDays] = useState(30)
+  const [promotingId, setPromotingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setLeads(null)
     setError(null)
+    if (tab === 'likely') {
+      setLeads(null)
+      setCandidates(null)
+      adk
+        .get<{
+          items: WaitlistCandidate[]
+          note?: string
+        }>(
+          `/leads/waitlist-candidates?days=${encodeURIComponent(String(candidateDays))}`,
+        )
+        .then((d) => setCandidates(d.items || []))
+        .catch((e) => setError((e as Error).message))
+      return
+    }
+    setCandidates(null)
+    setLeads(null)
     const params = new URLSearchParams()
     params.set('status', 'waitlisted')
     params.set('min_score', '0') // waitlisted leads are pre-conversion; do not score-gate
@@ -77,7 +101,7 @@ export default function AdminWaitlistPage() {
       .get<{ items: AdkLead[] }>(`/leads?${params}`)
       .then((d) => setLeads(d.items || []))
       .catch((e) => setError((e as Error).message))
-  }, [tab])
+  }, [tab, candidateDays])
 
   const counts = useMemo(() => {
     if (!leads) return null
@@ -90,6 +114,23 @@ export default function AdminWaitlistPage() {
     return byIntent
   }, [leads])
 
+  async function promoteOne(sessionId: string) {
+    setPromotingId(sessionId)
+    setError(null)
+    try {
+      await adk.send(`/leads/promote-waitlist-candidates`, 'POST', {
+        session_ids: [sessionId],
+      })
+      setCandidates((prev) =>
+        prev ? prev.filter((c) => c.session_id !== sessionId) : prev,
+      )
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setPromotingId(null)
+    }
+  }
+
   if (error) return <PageError message={error} />
 
   return (
@@ -100,12 +141,22 @@ export default function AdminWaitlistPage() {
             <ListChecks size={22} strokeWidth={1.8} className="text-action" />
             Waitlist
           </h1>
-          <p className="text-body-sm text-subtle mt-1">
-            Leads the agent could not match to a verified property — surfaced here
-            so the listing-monitor agent (or a human) can reach out when stock arrives.
+          <p className="text-body-sm text-subtle mt-1 max-w-3xl">
+            <strong className="text-navy font-semibold">Confirmed waitlist</strong>{' '}
+            (Rent / Buy / Invest / All tabs) lists leads with{' '}
+            <code className="text-caption bg-beige px-1 rounded">status=waitlisted</code>{' '}
+            — the agent explicitly captured them or ops promoted them.{' '}
+            <strong className="text-navy font-semibold">Likely (from chats)</strong>{' '}
+            is a pre-waitlist heuristic: people who probably hit a no-match path but
+            are not yet on the confirmed queue; use Promote to add them.
           </p>
         </div>
-        {leads !== null && (
+        {tab === 'likely' && candidates !== null && (
+          <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 text-body-sm font-semibold px-3 py-1.5 rounded-badge border border-amber-200/80">
+            {candidates.length} likely (last {candidateDays}d)
+          </span>
+        )}
+        {tab !== 'likely' && leads !== null && (
           <span className="inline-flex items-center gap-1.5 bg-action-light text-action text-body-sm font-semibold px-3 py-1.5 rounded-badge border border-action/20">
             {leads.length} on {tab === 'all' ? 'waitlist' : `${tab} waitlist`}
           </span>
@@ -118,9 +169,11 @@ export default function AdminWaitlistPage() {
           const count =
             t.id === 'all'
               ? leads?.length
-              : counts
-                ? (counts as Record<string, number>)[t.id] ?? 0
-                : undefined
+              : t.id === 'likely'
+                ? candidates?.length
+                : counts
+                  ? (counts as Record<string, number>)[t.id] ?? 0
+                  : undefined
           return (
             <button
               key={t.id}
@@ -139,7 +192,108 @@ export default function AdminWaitlistPage() {
       </div>
 
       <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden animate-fade-up">
-        {leads === null ? (
+        {tab === 'likely' && candidates === null ? (
+          <PageLoading />
+        ) : tab === 'likely' && candidates?.length === 0 ? (
+          <div className="p-12 text-center space-y-2">
+            <ListChecks
+              size={42}
+              strokeWidth={1.2}
+              className="mx-auto text-subtle mb-3"
+            />
+            <p className="text-body-sm text-subtle">
+              No heuristic matches in the last {candidateDays} days.
+            </p>
+            <p className="text-caption text-subtle max-w-lg mx-auto">
+              Sparse user text in historical <code className="text-caption">events</code>{' '}
+              rows reduces recall — check <code className="text-caption">ai_promises</code>{' '}
+              backlog or run WhatsApp transcripts with tooling enabled.
+            </p>
+          </div>
+        ) : tab === 'likely' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-beige/50 text-caption font-semibold text-subtle uppercase tracking-wider">
+                  <th className="px-6 py-3">Lead</th>
+                  <th className="px-6 py-3">Score</th>
+                  <th className="px-6 py-3">Reasons</th>
+                  <th className="px-6 py-3">Snippet</th>
+                  <th className="px-6 py-3">Last activity</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {(candidates ?? []).map((c) => (
+                  <tr
+                    key={c.session_id}
+                    className="hover:bg-beige/30 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <p className="font-semibold text-navy">
+                        {c.lead_name || 'Unknown'}
+                      </p>
+                      <p className="text-caption text-subtle flex items-center gap-1 mt-0.5">
+                        {c.phone ? (
+                          <>
+                            <Phone size={11} strokeWidth={1.8} />
+                            {c.phone}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded text-caption font-bold ${scoreClass(c.score)}`}
+                      >
+                        {c.score}/100
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-caption text-subtle max-w-[14rem]">
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {c.reasons.map((r, i) => (
+                          <li key={`${i}-${r}`}>{r}</li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td className="px-6 py-4 text-caption text-subtle max-w-[18rem] whitespace-pre-wrap">
+                      {c.snippet}
+                    </td>
+                    <td className="px-6 py-4 text-caption text-subtle whitespace-nowrap">
+                      {c.last_message_at
+                        ? formatRelativeTime(c.last_message_at)
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-right space-y-2">
+                      <button
+                        type="button"
+                        disabled={promotingId === c.session_id}
+                        onClick={() => promoteOne(c.session_id)}
+                        className="inline-flex items-center gap-1.5 text-body-sm font-semibold text-white bg-action hover:bg-action-hover disabled:opacity-50 px-3 py-1.5 rounded-button"
+                      >
+                        <ListChecks size={14} strokeWidth={2} />
+                        {promotingId === c.session_id
+                          ? 'Promoting…'
+                          : 'Promote to waitlist'}
+                      </button>
+                      <div>
+                        <Link
+                          href={`/admin/conversations?id=${encodeURIComponent(c.session_id)}`}
+                          className="inline-flex items-center gap-1.5 text-body-sm font-semibold text-action hover:text-action-hover bg-action-light px-3 py-1.5 rounded-button"
+                        >
+                          <MessageSquare size={12} strokeWidth={2} />
+                          Open chat
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : leads === null ? (
           <PageLoading />
         ) : leads.length === 0 ? (
           <div className="p-12 text-center">

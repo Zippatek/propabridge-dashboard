@@ -2,7 +2,18 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ShieldAlert, Loader2, RefreshCw, ExternalLink, AlertTriangle, AlertCircle, Info, Wand2 } from 'lucide-react'
+import {
+  ShieldAlert,
+  Loader2,
+  RefreshCw,
+  ExternalLink,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  Wand2,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { PageError } from '@/components/admin/AsyncBoundary'
 
@@ -12,6 +23,7 @@ interface Issue {
   message: string
   suggestion?: string
   source?: string
+  issueType?: string
 }
 interface AuditRow {
   id: string
@@ -21,6 +33,8 @@ interface AuditRow {
   severity: 'high' | 'medium' | 'low' | 'none' | null
   created_at: string
   fix_log?: unknown
+  /** Analyst hint from gateway (pricing semantics); optional */
+  pricing_hint?: string | null
 }
 
 interface AutofixPreviewPayload {
@@ -32,6 +46,7 @@ interface AutofixPreviewPayload {
   patchedFields: string[]
   skipped: { field: string; reason: string }[]
   anthropicUnavailable?: { message: string; providerDetail?: string }
+  user_context?: string
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -73,7 +88,7 @@ interface AutofixApiResponse {
 }
 
 async function postPropertyAutofix(
-  body: Record<string, unknown>,
+  body: Record<string, unknown> & { user_context?: string },
 ): Promise<{ status: number; data: AutofixApiResponse }> {
   const res = await fetch(`/api/admin/be/admin/property-audit/autofix`, {
     method: 'POST',
@@ -115,14 +130,35 @@ export default function AdminAuditPage() {
   const [applyLoading, setApplyLoading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [billingBanner, setBillingBanner] = useState<string | null>(null)
+  const [autofixContextModal, setAutofixContextModal] = useState('')
+  const [flaggedTotal, setFlaggedTotal] = useState<number | null>(null)
+  const [expandedPid, setExpandedPid] = useState<string | null>(null)
+  /** Optional operator notes passed to Gemini autofix (per property id) */
+  const [fixContextByProperty, setFixContextByProperty] = useState<Record<string, string>>({})
+  const [listingEdit, setListingEdit] = useState<
+    Record<
+      string,
+      {
+        price: string
+        listing_type: string
+        size_sqm: string
+        intent: string
+        loaded: boolean
+        saving: boolean
+      }
+    >
+  >({})
 
   const load = useCallback(async (sev: string) => {
     setError(null)
     try {
       const params = new URLSearchParams({ limit: '200' })
       if (sev !== 'all') params.set('severity', sev)
-      const data = await be.get<{ items: AuditRow[] }>(`/admin/property-audit/results?${params}`)
+      const data = await be.get<{ items: AuditRow[]; flagged_total?: number }>(
+        `/admin/property-audit/results?${params}`,
+      )
       setRows(data.items || [])
+      if (typeof data.flagged_total === 'number') setFlaggedTotal(data.flagged_total)
     } catch (e) {
       setError((e as Error).message)
     }
@@ -130,8 +166,128 @@ export default function AdminAuditPage() {
 
   useEffect(() => { load(severityFilter) }, [load, severityFilter])
 
+  useEffect(() => {
+    if (preview) setAutofixContextModal(preview.user_context || '')
+  }, [preview])
+
   function issueRef(auditRowId: string, index: number) {
     return `${auditRowId}:${index}`
+  }
+
+  const normalizeListingTypeUi = (raw: string | null | undefined): string => {
+    const s = String(raw || '').toLowerCase()
+    if (s.includes('rent')) return 'rent'
+    return 'sale'
+  }
+
+  const ensureListingEdit = async (pid: string) => {
+    if (listingEdit[pid]?.loaded) return
+    setListingEdit(prev => ({
+      ...prev,
+      [pid]: {
+        price: '',
+        listing_type: 'sale',
+        size_sqm: '',
+        intent: '',
+        loaded: false,
+        saving: false,
+      },
+    }))
+    try {
+      const json = await be.get<{
+        success?: boolean
+        data?: {
+          price?: number | null
+          listing_type?: string | null
+          size_sqm?: number | string | null
+          intent?: string | null
+        }
+      }>(`/listings/${encodeURIComponent(pid)}`)
+      const row =
+        json.data ??
+        (json as unknown as {
+          price?: number | null
+          listing_type?: string | null
+          size_sqm?: number | string | null
+          intent?: string | null
+        })
+      const r = row as {
+        price?: number | null
+        listing_type?: string | null
+        size_sqm?: number | string | null
+        intent?: string | null
+      }
+      setListingEdit(prev => ({
+        ...prev,
+        [pid]: {
+          price: r.price != null ? String(r.price) : '',
+          listing_type: normalizeListingTypeUi(r.listing_type),
+          size_sqm: r.size_sqm != null ? String(r.size_sqm) : '',
+          intent: r.intent != null ? String(r.intent) : '',
+          loaded: true,
+          saving: false,
+        },
+      }))
+    } catch {
+      setListingEdit(prev => ({
+        ...prev,
+        [pid]: {
+          price: '',
+          listing_type: 'sale',
+          size_sqm: '',
+          intent: '',
+          loaded: true,
+          saving: false,
+        },
+      }))
+    }
+  }
+
+  const toggleExpand = (pid: string) => {
+    if (expandedPid === pid) {
+      setExpandedPid(null)
+      return
+    }
+    setExpandedPid(pid)
+    void ensureListingEdit(pid)
+  }
+
+  const saveListingPatch = async (pid: string) => {
+    const ed = listingEdit[pid]
+    if (!ed) return
+    setListingEdit(prev => ({ ...prev, [pid]: { ...ed, saving: true } }))
+    setNotice(null)
+    setError(null)
+    try {
+      const payload: Record<string, unknown> = {}
+      if (ed.price.trim()) {
+        const n = Number(ed.price)
+        if (!Number.isFinite(n)) throw new Error('Price must be a number')
+        payload.price = n
+      }
+      if (ed.listing_type) payload.listing_type = ed.listing_type
+      if (ed.size_sqm.trim()) {
+        const n = Number(ed.size_sqm)
+        if (!Number.isFinite(n)) throw new Error('Size must be a number')
+        payload.size_sqm = n
+      }
+      if (ed.intent.trim()) payload.intent = ed.intent.trim()
+      if (Object.keys(payload).length === 0) {
+        setNotice('No field changes to save.')
+        return
+      }
+      await be.send(`/listings/${encodeURIComponent(pid)}`, 'PATCH', payload)
+      setNotice('Listing saved. Audit list refreshed.')
+      await load(severityFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setListingEdit(prev => {
+        const cur = prev[pid]
+        if (!cur) return prev
+        return { ...prev, [pid]: { ...cur, saving: false } }
+      })
+    }
   }
 
   const dryRunAutofix = async (
@@ -144,11 +300,13 @@ export default function AdminAuditPage() {
     setNotice(null)
     setBillingBanner(null)
     setError(null)
+    const uc = (fixContextByProperty[propertyId] || '').trim()
     try {
       const { data } = await postPropertyAutofix({
         propertyId,
         issueIds: issueIds ?? undefined,
         dryRun: true,
+        ...(uc ? { user_context: uc } : {}),
       })
       const detail =
         data.provider_detail !== undefined && data.provider_detail !== null
@@ -164,6 +322,7 @@ export default function AdminAuditPage() {
         before: data.before || {},
         patchedFields: data.patchedFields || [],
         skipped: data.skipped || [],
+        user_context: uc || undefined,
         anthropicUnavailable:
           data.error === 'anthropic_unavailable'
             ? { message: data.message || 'Anthropic is unavailable.', providerDetail: detail }
@@ -183,10 +342,12 @@ export default function AdminAuditPage() {
     setBillingBanner(null)
     setError(null)
     try {
+      const uc = autofixContextModal.trim()
       const { data } = await postPropertyAutofix({
         propertyId: preview.propertyId,
         issueIds: preview.issueIds ?? undefined,
         dryRun: false,
+        ...(uc ? { user_context: uc } : {}),
       })
       setPreview(null)
       setNotice(
@@ -230,7 +391,16 @@ export default function AdminAuditPage() {
             <ShieldAlert size={22} className="text-action" /> Data-Quality Audit
           </h1>
           <p className="text-body-sm text-subtle mt-0.5">
-            Rule-based + AI checks. {rows ? `${rows.length} flagged record${rows.length === 1 ? '' : 's'}` : '…'}
+            Rule-based + AI checks.{' '}
+            {rows
+              ? (() => {
+                  const n = flaggedTotal ?? rows.length
+                  return `${n} flagged record${n === 1 ? '' : 's'}`
+                })()
+              : '…'}
+            {rows && flaggedTotal != null && rows.length < flaggedTotal ? (
+              <span className="text-caption"> (showing latest {rows.length})</span>
+            ) : null}
           </p>
         </div>
         <button
@@ -300,7 +470,21 @@ export default function AdminAuditPage() {
           {rows.map(r => (
             <div key={r.id} className="bg-white rounded-card border border-divider shadow-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex items-start gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(r.property_id)}
+                    className="mt-0.5 p-0.5 text-subtle hover:text-navy rounded"
+                    aria-expanded={expandedPid === r.property_id}
+                    title={expandedPid === r.property_id ? 'Collapse' : 'Expand listing edits'}
+                  >
+                    {expandedPid === r.property_id ? (
+                      <ChevronDown size={18} strokeWidth={2} />
+                    ) : (
+                      <ChevronRight size={18} strokeWidth={2} />
+                    )}
+                  </button>
+                  <div>
                   <p className="text-body-sm font-semibold text-navy line-clamp-1">
                     {r.property_title || '(deleted property)'}
                   </p>
@@ -308,6 +492,7 @@ export default function AdminAuditPage() {
                     id <code className="text-[11px] bg-beige px-1 rounded">{r.property_id}</code>
                     {' · '}{new Date(r.created_at).toLocaleString()}
                   </p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {r.severity && r.severity !== 'none' && (
@@ -336,6 +521,148 @@ export default function AdminAuditPage() {
                   </Link>
                 </div>
               </div>
+              {r.pricing_hint ? (
+                <p className="text-caption text-subtle mb-2 pl-7 border-l-2 border-action/30">
+                  <span className="font-semibold text-navy">Pricing model hint:</span> {r.pricing_hint}
+                </p>
+              ) : null}
+              {expandedPid === r.property_id && (
+                <div className="mb-4 pl-7 space-y-3 pt-1 border-t border-divider/80">
+                  <div>
+                    <label className="text-caption font-semibold text-subtle uppercase tracking-wide">Fix context (optional)</label>
+                    <p className="text-[11px] text-placeholder mb-1">
+                      Passed to AI auto-fix as operator constraints only; does not override database facts.
+                    </p>
+                    <textarea
+                      value={fixContextByProperty[r.property_id] ?? ''}
+                      onChange={e =>
+                        setFixContextByProperty(prev => ({
+                          ...prev,
+                          [r.property_id]: e.target.value,
+                        }))
+                      }
+                      rows={3}
+                      className="w-full mt-1 px-3 py-2 rounded-input border border-divider text-body-sm text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
+                      placeholder="e.g. Price is annual rent; title uses per-sqm developer rate…"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Price</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={listingEdit[r.property_id]?.price ?? ''}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              price: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm"
+                      />
+                    </label>
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Listing type</span>
+                      <select
+                        value={listingEdit[r.property_id]?.listing_type ?? 'sale'}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              listing_type: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm bg-white"
+                      >
+                        <option value="sale">Sale</option>
+                        <option value="rent">Rent</option>
+                      </select>
+                    </label>
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Size (m²)</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={listingEdit[r.property_id]?.size_sqm ?? ''}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              size_sqm: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm"
+                      />
+                    </label>
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Intent</span>
+                      <input
+                        type="text"
+                        value={listingEdit[r.property_id]?.intent ?? ''}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              intent: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled={listingEdit[r.property_id]?.saving}
+                      onClick={() => saveListingPatch(r.property_id)}
+                      className="px-4 py-2 rounded-button bg-navy text-white text-body-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                    >
+                      {listingEdit[r.property_id]?.saving ? (
+                        <Loader2 size={14} className="animate-spin inline" />
+                      ) : null}{' '}
+                      Save listing fields
+                    </button>
+                  </div>
+                </div>
+              )}
               <ul className="space-y-1.5">
                 {r.issues.map((issue, idx) => {
                   const Icon = SEV_ICON[issue.severity] || Info
@@ -351,6 +678,11 @@ export default function AdminAuditPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-navy">{issue.field}</span>
+                          {issue.issueType === 'informational_price_per_sqm' && (
+                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-beige text-subtle border border-divider">
+                              per-sqm info
+                            </span>
+                          )}
                           {AUTOFIXABLE_FIELDS.has(issue.field) && (
                             <button
                               type="button"
@@ -470,6 +802,16 @@ export default function AdminAuditPage() {
                   </ul>
                 </div>
               )}
+              <div>
+                <label className="text-caption font-semibold text-subtle uppercase tracking-wide">Fix context for apply</label>
+                <textarea
+                  value={autofixContextModal}
+                  onChange={e => setAutofixContextModal(e.target.value)}
+                  rows={2}
+                  className="w-full mt-1 px-3 py-2 rounded-input border border-divider text-body-sm"
+                  placeholder="Operator notes sent with Apply (same as row expand)"
+                />
+              </div>
             </div>
             <div className="px-5 py-3 border-t border-divider flex flex-wrap justify-end gap-2 bg-beige/50">
               <button

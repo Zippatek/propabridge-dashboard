@@ -28,6 +28,17 @@ export interface SessionListItem {
   updated_at: string | null
 }
 
+/** Heuristic pre-waitlist row from GET /leads/waitlist-candidates */
+export interface WaitlistCandidate {
+  session_id: string
+  phone?: string | null
+  lead_name?: string | null
+  last_message_at?: string | null
+  reasons: string[]
+  score: number
+  snippet: string
+}
+
 export interface AdkLead {
   id: string
   session_id?: string | null
@@ -43,6 +54,8 @@ export interface AdkLead {
   bedrooms?: number | null
   timeline?: string | null
   notes?: string | null
+  /** e.g. chat_heuristic after admin promote from Likely tab */
+  waitlist_source?: string | null
   /** Populated when the row was seeded from ai_promises backfill */
   waitlist_source_promise_id?: string | null
   waitlist_criteria?: Record<string, unknown> | null
