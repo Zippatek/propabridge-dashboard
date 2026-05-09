@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ShieldAlert, Loader2, RefreshCw, ExternalLink, AlertTriangle, AlertCircle, Info } from 'lucide-react'
+import { ShieldAlert, Loader2, RefreshCw, ExternalLink, AlertTriangle, AlertCircle, Info, Wand2 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { PageError } from '@/components/admin/AsyncBoundary'
 
@@ -20,6 +20,17 @@ interface AuditRow {
   issues: Issue[]
   severity: 'high' | 'medium' | 'low' | 'none' | null
   created_at: string
+  fix_log?: unknown
+}
+
+interface AutofixPreviewPayload {
+  propertyId: string
+  auditRowId: string
+  issueIds: string[] | null
+  proposed: Record<string, unknown>
+  before: Record<string, unknown>
+  patchedFields: string[]
+  skipped: { field: string; reason: string }[]
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -33,12 +44,35 @@ const SEV_ICON = {
   low: Info,
 }
 
+/** Fields the backend auto-fix whitelist allows */
+const AUTOFIXABLE_FIELDS = new Set([
+  'city',
+  'property_type',
+  'listing_type',
+  'description',
+  'summary',
+  'search_keywords',
+  'slug',
+])
+
+function formatFieldValue(v: unknown): string {
+  if (v === null || v === undefined) return '—'
+  if (Array.isArray(v)) return v.join(', ') || '—'
+  if (typeof v === 'object') return JSON.stringify(v)
+  const s = String(v)
+  return s.length > 800 ? `${s.slice(0, 800)}…` : s
+}
+
 export default function AdminAuditPage() {
   const [rows, setRows] = useState<AuditRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [runMsg, setRunMsg] = useState<string | null>(null)
   const [severityFilter, setSeverityFilter] = useState<string>('all')
+  const [autofixLoading, setAutofixLoading] = useState<string | null>(null)
+  const [preview, setPreview] = useState<AutofixPreviewPayload | null>(null)
+  const [applyLoading, setApplyLoading] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const load = useCallback(async (sev: string) => {
     setError(null)
@@ -53,6 +87,76 @@ export default function AdminAuditPage() {
   }, [])
 
   useEffect(() => { load(severityFilter) }, [load, severityFilter])
+
+  function issueRef(auditRowId: string, index: number) {
+    return `${auditRowId}:${index}`
+  }
+
+  const dryRunAutofix = async (
+    propertyId: string,
+    auditRowId: string,
+    issueIds: string[] | null,
+  ) => {
+    const loadKey = `${propertyId}:${issueIds?.join(',') ?? 'all'}`
+    setAutofixLoading(loadKey)
+    setNotice(null)
+    setError(null)
+    try {
+      const res = await be.send<{
+        proposed: Record<string, unknown>
+        before: Record<string, unknown>
+        patchedFields: string[]
+        skipped: { field: string; reason: string }[]
+        dryRun?: boolean
+      }>('/admin/property-audit/autofix', 'POST', {
+        propertyId,
+        issueIds: issueIds ?? undefined,
+        dryRun: true,
+      })
+      setPreview({
+        propertyId,
+        auditRowId,
+        issueIds,
+        proposed: res.proposed || {},
+        before: res.before || {},
+        patchedFields: res.patchedFields || [],
+        skipped: res.skipped || [],
+      })
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setAutofixLoading(null)
+    }
+  }
+
+  const applyAutofix = async () => {
+    if (!preview) return
+    setApplyLoading(true)
+    setNotice(null)
+    setError(null)
+    try {
+      const res = await be.send<{ applied: boolean; patchedFields?: string[] }>(
+        '/admin/property-audit/autofix',
+        'POST',
+        {
+          propertyId: preview.propertyId,
+          issueIds: preview.issueIds ?? undefined,
+          dryRun: false,
+        },
+      )
+      setPreview(null)
+      setNotice(
+        res.applied
+          ? `Applied updates: ${(res.patchedFields || []).join(', ') || 'none'}.`
+          : 'No changes applied.',
+      )
+      await load(severityFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setApplyLoading(false)
+    }
+  }
 
   const runNow = async () => {
     setRunning(true); setRunMsg(null); setError(null)
@@ -69,7 +173,7 @@ export default function AdminAuditPage() {
     }
   }
 
-  if (error) return <PageError message={error} />
+  if (error && !rows) return <PageError message={error} />
 
   return (
     <div className="space-y-6">
@@ -95,6 +199,16 @@ export default function AdminAuditPage() {
       {runMsg && (
         <div className="bg-action-light border border-action/20 text-action text-body-sm rounded-card px-4 py-2.5">
           {runMsg}
+        </div>
+      )}
+      {notice && (
+        <div className="bg-action-light border border-action/20 text-action text-body-sm rounded-card px-4 py-2.5">
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="bg-danger-light border border-danger/20 text-danger text-body-sm rounded-card px-4 py-2.5">
+          {error}
         </div>
       )}
 
@@ -135,12 +249,25 @@ export default function AdminAuditPage() {
                     {' · '}{new Date(r.created_at).toLocaleString()}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {r.severity && r.severity !== 'none' && (
                     <span className={`px-2 py-0.5 rounded-badge text-[10px] font-bold uppercase border ${SEV_COLOR[r.severity] || SEV_COLOR.low}`}>
                       {r.severity}
                     </span>
                   )}
+                  <button
+                    type="button"
+                    disabled={!!autofixLoading}
+                    onClick={() => dryRunAutofix(r.property_id, r.id, null)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-badge text-caption font-semibold bg-beige border border-divider text-navy hover:bg-action-light hover:border-action/30 disabled:opacity-50"
+                  >
+                    {autofixLoading === `${r.property_id}:all` ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Wand2 size={12} />
+                    )}
+                    Auto-fix all (in scope)
+                  </button>
                   <Link
                     href={`/admin/listings?focus=${r.property_id}`}
                     className="flex items-center gap-1 text-caption text-action hover:underline"
@@ -161,8 +288,25 @@ export default function AdminAuditPage() {
                           issue.severity === 'medium' ? 'text-orange-600' : 'text-subtle'
                         }`}
                       />
-                      <div className="min-w-0">
-                        <span className="font-semibold text-navy">{issue.field}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-navy">{issue.field}</span>
+                          {AUTOFIXABLE_FIELDS.has(issue.field) && (
+                            <button
+                              type="button"
+                              disabled={!!autofixLoading}
+                              onClick={() =>
+                                dryRunAutofix(r.property_id, r.id, [issueRef(r.id, idx)])
+                              }
+                              className="text-[10px] font-semibold uppercase tracking-wide text-action hover:underline disabled:opacity-50"
+                            >
+                              {autofixLoading === `${r.property_id}:${issueRef(r.id, idx)}` ? (
+                                <Loader2 size={10} className="inline animate-spin" />
+                              ) : null}{' '}
+                              Auto-fix this
+                            </button>
+                          )}
+                        </div>
                         <span className="text-subtle"> — {issue.message}</span>
                         {issue.suggestion && (
                           <span className="block text-caption text-action mt-0.5">→ {issue.suggestion}</span>
@@ -177,6 +321,95 @@ export default function AdminAuditPage() {
               </ul>
             </div>
           ))}
+        </div>
+      )}
+
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/40 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal
+          aria-labelledby="autofix-preview-title"
+        >
+          <div className="bg-white rounded-card border border-divider shadow-card max-w-2xl w-full max-h-[min(90vh,800px)] overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-divider flex items-start justify-between gap-3">
+              <div>
+                <h2 id="autofix-preview-title" className="text-body font-semibold text-navy">
+                  Review AI suggestions
+                </h2>
+                <p className="text-caption text-subtle mt-0.5">
+                  Property <code className="text-[11px] bg-beige px-1 rounded">{preview.propertyId}</code>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="text-subtle hover:text-navy text-caption font-semibold px-2 py-1"
+              >
+                Close
+              </button>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+              {preview.patchedFields.length === 0 && (
+                <p className="text-body-sm text-subtle">
+                  No field changes proposed. You can still review skipped items below.
+                </p>
+              )}
+              {preview.patchedFields.length > 0 && (
+                <table className="w-full text-body-sm border border-divider rounded-lg overflow-hidden">
+                  <thead className="bg-beige text-caption text-left text-subtle">
+                    <tr>
+                      <th className="p-2 font-semibold">Field</th>
+                      <th className="p-2 font-semibold">Before</th>
+                      <th className="p-2 font-semibold">After</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.patchedFields.map(key => (
+                      <tr key={key} className="border-t border-divider align-top">
+                        <td className="p-2 font-semibold text-navy whitespace-nowrap">{key}</td>
+                        <td className="p-2 text-subtle break-words max-w-[min(200px,40vw)]">
+                          {formatFieldValue(preview.before[key])}
+                        </td>
+                        <td className="p-2 text-navy break-words max-w-[min(200px,40vw)]">
+                          {formatFieldValue(preview.proposed[key])}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {preview.skipped.length > 0 && (
+                <div>
+                  <p className="text-caption font-semibold text-subtle uppercase tracking-wide mb-1.5">Skipped</p>
+                  <ul className="list-disc list-inside text-body-sm text-subtle space-y-0.5">
+                    {preview.skipped.map(s => (
+                      <li key={`${s.field}-${s.reason}`}>
+                        <span className="font-medium text-navy">{s.field}</span>: {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-divider flex flex-wrap justify-end gap-2 bg-beige/50">
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="px-4 py-2 rounded-button border border-divider text-body-sm font-semibold text-subtle hover:bg-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={applyLoading || preview.patchedFields.length === 0}
+                onClick={() => applyAutofix()}
+                className="px-4 py-2 rounded-button bg-action text-white text-body-sm font-semibold hover:bg-action-hover disabled:opacity-50"
+              >
+                {applyLoading ? <Loader2 size={14} className="animate-spin inline" /> : null} Apply to listing
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
