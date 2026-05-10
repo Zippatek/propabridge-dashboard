@@ -157,7 +157,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Session ID required' }, { status: 400 })
     }
 
-    const result = await adkFetch(endpoint, {
+    const result = await adkFetch<Record<string, any>>(endpoint, {
       method: 'POST',
       body: JSON.stringify({
         note: note.trim(),
