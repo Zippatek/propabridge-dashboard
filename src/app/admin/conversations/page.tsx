@@ -279,7 +279,7 @@ function useTakeoverStatus(sessionId: string | null) {
     refresh()
   }, [refresh])
 
-  const takeover = async () => {
+  const takeover = async (agentName?: string) => {
     if (!sessionId) return
     setLoading(true)
     setFetchError(null)
@@ -287,7 +287,7 @@ function useTakeoverStatus(sessionId: string | null) {
       const r = await adk.fetchJson(`/conversations/${encodeURIComponent(sessionId)}/takeover`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ active: true }),
+        body: JSON.stringify({ active: true, agent_name: agentName || undefined }),
       })
       if (!r.ok) {
         const errBody =
@@ -358,8 +358,22 @@ function ConversationsView() {
     fetchError: takeoverFetchError,
   } = useTakeoverStatus(selectedId)
 
+  const [showNamePrompt, setShowNamePrompt] = useState(false)
+  const [agentNameInput, setAgentNameInput] = useState('')
+
   const takeover = async () => {
-    await rawTakeover()
+    if (!isTakenOver) {
+      setAgentNameInput('')
+      setShowNamePrompt(true)
+    } else {
+      await rawTakeover()
+      setConversationBump((prev) => prev + 1)
+    }
+  }
+
+  const confirmTakeover = async () => {
+    setShowNamePrompt(false)
+    await rawTakeover(agentNameInput.trim() || undefined)
     setConversationBump((prev) => prev + 1)
   }
   const [filter, setFilter] = useState('')
@@ -815,6 +829,52 @@ function ConversationsView() {
           </>
         )}
       </section>
+
+      {/* ─── Name Prompt Overlay Dialog ─── */}
+      {showNamePrompt && (
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg border border-divider max-w-sm w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="space-y-1">
+              <h3 className="text-body font-bold text-navy">Enter Your Name</h3>
+              <p className="text-caption text-subtle">
+                Personalize the automatic takeover welcome message. Leave this blank to send a generic greeting from the team.
+              </p>
+            </div>
+            
+            <input
+              type="text"
+              value={agentNameInput}
+              onChange={(e) => setAgentNameInput(e.target.value)}
+              placeholder="Your Name (e.g. Amina)"
+              className="w-full px-4 py-2.5 rounded-input border border-divider bg-white text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent text-body-sm transition-all duration-150"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  confirmTakeover()
+                } else if (e.key === 'Escape') {
+                  setShowNamePrompt(false)
+                }
+              }}
+            />
+            
+            <div className="flex items-center justify-end gap-2 text-caption">
+              <button
+                onClick={() => setShowNamePrompt(false)}
+                className="px-4 py-2 rounded-button border border-divider text-subtle hover:bg-beige transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmTakeover}
+                disabled={takeoverLoading}
+                className="px-4 py-2 rounded-button bg-action hover:bg-action-hover text-white font-semibold transition-colors flex items-center gap-1.5"
+              >
+                {takeoverLoading ? <LoadingSpinner size="sm" /> : 'Confirm Takeover'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
