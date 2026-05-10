@@ -53,7 +53,6 @@ const sections: Array<{
       { icon: ListChecks, label: 'Waitlist', href: '/admin/waitlist' },
       { icon: AlertTriangle, label: 'Promises / Escalations', href: '/admin/promises' },
       { icon: ShieldAlert, label: 'Data Quality Audit', href: '/admin/audit' },
-      { icon: UserRoundCog, label: 'Relationships', href: '/admin/relationships' },
       { icon: Bot, label: 'AI Agents', href: '/admin/ai-agents' },
       { icon: LayoutTemplate, label: 'WhatsApp Templates', href: '/admin/templates' },
     ],

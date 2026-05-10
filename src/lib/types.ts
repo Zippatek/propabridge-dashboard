@@ -65,6 +65,19 @@ export interface UserRelationshipProfile {
   created_at?: string | null
   updated_at?: string | null
   metadata?: Record<string, unknown> | null
+  notes?: UserRelationshipNote[] | null
+}
+
+export interface UserRelationshipNote {
+  id: string
+  profile_id: string
+  user_id: string
+  content: string
+  author_type: 'human' | 'ai'
+  author_id?: string | null
+  reason?: string | null
+  created_at: string
+  updated_at: string
 }
 
 /** Heuristic pre-waitlist row from GET /leads/waitlist-candidates */

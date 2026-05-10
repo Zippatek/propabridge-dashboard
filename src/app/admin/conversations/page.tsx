@@ -14,6 +14,13 @@ import {
   ArrowLeftRight,
   AlertCircle,
   Shield,
+  PenLine,
+  Save,
+  CheckCircle2,
+  TrendingUp,
+  Brain,
+  Clock,
+  RefreshCw,
 } from 'lucide-react'
 import type {
   SessionListItem,
@@ -385,6 +392,11 @@ function ConversationsView() {
 
   const [showNamePrompt, setShowNamePrompt] = useState(false)
   const [agentNameInput, setAgentNameInput] = useState('')
+  const [noteText, setNoteText] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [noteSaved, setNoteSaved] = useState(false)
+  const [noteError, setNoteError] = useState<string | null>(null)
+  const [loadingRelationship, setLoadingRelationship] = useState(false)
 
   const takeover = async () => {
     if (!isTakenOver) {
@@ -463,6 +475,28 @@ function ConversationsView() {
       setSendError((err as Error).message)
     } finally {
       setSending(false)
+    }
+  }
+
+  const saveNote = async () => {
+    if (!selectedId || !noteText.trim()) return
+    setSavingNote(true)
+    setNoteError(null)
+    setNoteSaved(false)
+    try {
+      await adk.send(
+        `/conversations/${encodeURIComponent(selectedId)}/relationship/note`,
+        'POST',
+        { note: noteText.trim(), agent_name: 'admin' },
+      )
+      setNoteSaved(true)
+      setNoteText('')
+      setConversationBump((b) => b + 1)
+      setTimeout(() => setNoteSaved(false), 3000)
+    } catch (e) {
+      setNoteError((e as Error).message)
+    } finally {
+      setSavingNote(false)
     }
   }
 
@@ -788,134 +822,186 @@ function ConversationsView() {
                 )}
               </div>
 
-              {/* Lead context */}
-              <aside className="hidden lg:block w-64 border-l border-divider p-5 overflow-y-auto bg-beige/20 flex-shrink-0">
-                <p className="text-caption text-placeholder uppercase tracking-wider font-semibold mb-3">
-                  Lead Context
-                </p>
+              {/* ─── User Profile & Memory panel ─── */}
+              <aside className="hidden lg:flex w-72 border-l border-divider flex-col bg-white flex-shrink-0">
+                {/* Panel header */}
+                <div className="px-5 py-4 border-b border-divider flex items-center justify-between flex-shrink-0">
+                  <p className="text-body-sm font-bold text-navy flex items-center gap-2">
+                    <Brain size={15} strokeWidth={1.8} className="text-action" />
+                    User Profile & Memory
+                  </p>
+                  {relationship?.relationship_stage && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-badge capitalize ${
+                      relationship.relationship_stage === 'hot_lead'
+                        ? 'bg-danger-light text-danger'
+                        : relationship.relationship_stage === 'qualified' || relationship.relationship_stage === 'viewing_scheduled'
+                        ? 'bg-verified-light text-verified'
+                        : relationship.relationship_stage === 'waitlisted' || relationship.relationship_stage === 'fresh_start'
+                        ? 'bg-action-light text-action'
+                        : 'bg-gold-light text-[#5d3e02]'
+                    }`}>
+                      {relationship.relationship_stage.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
+
                 {!detail ? (
-                  <LoadingSpinner size="sm" />
+                  <div className="flex-1 flex items-center justify-center">
+                    <LoadingSpinner size="sm" />
+                  </div>
                 ) : (
-                  <div className="space-y-4 text-body-sm">
-                    <div>
-                      <p className="text-caption text-subtle">Name</p>
-                      <p className="text-navy font-semibold flex items-center gap-1.5 mt-0.5">
-                        <User size={14} strokeWidth={1.5} />
-                        {detail.lead.name || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption text-subtle">Phone</p>
-                      <p className="text-navy flex items-center gap-1.5 mt-0.5">
-                        <Phone size={14} strokeWidth={1.5} />
-                        {leadPhoneLabel}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption text-subtle">Email</p>
-                      <p className="text-navy flex items-center gap-1.5 mt-0.5 truncate">
-                        <Mail size={14} strokeWidth={1.5} />
-                        {detail.lead.email || '—'}
-                      </p>
-                    </div>
-                    {relationship && (
-                      <>
-                        <div className="rounded-xl border border-action/15 bg-action-light/60 p-3 space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-caption text-action uppercase tracking-wider font-bold flex items-center gap-1.5">
-                              <Bot size={13} strokeWidth={1.8} />
-                              Propa Relationship Agent
-                            </p>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-badge bg-white text-action capitalize">
-                              {(relationship.relationship_stage || 'new').replace(/_/g, ' ')}
-                            </span>
-                          </div>
+                  <div className="flex-1 overflow-y-auto">
 
-                          <div>
-                            <p className="text-caption text-subtle">Memory Summary</p>
-                            <p className="text-caption text-navy leading-relaxed mt-0.5">
-                              {relationship.relationship_summary || 'No relationship memory captured yet.'}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-caption text-subtle">Next Best Action</p>
-                            <p className="text-caption text-navy font-semibold leading-relaxed mt-0.5">
-                              {relationship.next_best_action || 'Continue qualification.'}
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="bg-white border border-divider rounded-lg p-2">
-                              <p className="text-[10px] text-placeholder uppercase font-semibold">Engage</p>
-                              <p className="text-body-sm font-bold text-navy">{relationship.engagement_score ?? 0}</p>
-                            </div>
-                            <div className="bg-white border border-divider rounded-lg p-2">
-                              <p className="text-[10px] text-placeholder uppercase font-semibold">Convert</p>
-                              <p className="text-body-sm font-bold text-navy">{relationship.conversion_score ?? 0}</p>
-                            </div>
-                            <div className="bg-white border border-divider rounded-lg p-2">
-                              <p className="text-[10px] text-placeholder uppercase font-semibold">Risk</p>
-                              <p className={`text-body-sm font-bold ${(relationship.risk_of_churn ?? 0) >= 60 ? 'text-danger' : 'text-navy'}`}>
-                                {relationship.risk_of_churn ?? 0}
-                              </p>
-                            </div>
-                          </div>
-
-                          {relationship.next_followup_at && (
-                            <p className="text-[10px] text-subtle">
-                              Next follow-up: {formatDateTime(relationship.next_followup_at)}
-                            </p>
-                          )}
+                    {/* ── Contact ── */}
+                    <div className="px-5 pt-5 pb-4 space-y-3 border-b border-divider">
+                      <p className="text-[10px] font-bold text-placeholder uppercase tracking-wider">Contact</p>
+                      <div className="space-y-2 text-body-sm">
+                        <div className="flex items-center gap-2">
+                          <User size={13} strokeWidth={1.5} className="text-subtle flex-shrink-0" />
+                          <span className="font-semibold text-navy truncate">{detail.lead.name || '—'}</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Phone size={13} strokeWidth={1.5} className="text-subtle flex-shrink-0" />
+                          <span className="text-navy truncate">{leadPhoneLabel}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Mail size={13} strokeWidth={1.5} className="text-subtle flex-shrink-0" />
+                          <span className="text-navy truncate">{detail.lead.email || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
 
-                        <hr className="border-divider" />
-                      </>
-                    )}
-
-                    <hr className="border-divider" />
-
-                    {/* ─── Takeover status in sidebar ─── */}
-                    <div>
-                      <p className="text-caption text-subtle">Agent Mode</p>
-                      <div className="flex items-center gap-1.5 mt-1">
+                    {/* ── Agent mode ── */}
+                    <div className="px-5 py-4 border-b border-divider">
+                      <p className="text-[10px] font-bold text-placeholder uppercase tracking-wider mb-2">Agent Mode</p>
+                      <div className="flex items-center gap-2">
                         {isTakenOver ? (
                           <>
-                            <div className="w-2 h-2 rounded-full bg-[#ffc870] animate-pulse" />
-                            <span className="text-[#5d3e02] font-semibold text-caption">
-                              Human — Active
-                            </span>
+                            <div className="w-2 h-2 rounded-full bg-[#ffc870] animate-pulse flex-shrink-0" />
+                            <span className="text-[#5d3e02] font-semibold text-body-sm">Human — Active</span>
                           </>
                         ) : (
                           <>
-                            <div className="w-2 h-2 rounded-full bg-verified" />
-                            <span className="text-verified font-semibold text-caption">
-                              AI — Active
-                            </span>
+                            <div className="w-2 h-2 rounded-full bg-verified flex-shrink-0" />
+                            <span className="text-verified font-semibold text-body-sm">AI — Active</span>
                           </>
                         )}
                       </div>
                     </div>
 
-                    <hr className="border-divider" />
-                    <div>
-                      <p className="text-caption text-subtle">Intent</p>
-                      <p className="text-navy capitalize">{detail.lead.intent || '—'}</p>
+                    {/* ── Requirements ── */}
+                    <div className="px-5 py-4 border-b border-divider">
+                      <p className="text-[10px] font-bold text-placeholder uppercase tracking-wider mb-3">Requirements</p>
+                      <div className="grid grid-cols-2 gap-2 text-body-sm">
+                        <div className="bg-beige/60 rounded-lg p-2.5">
+                          <p className="text-[10px] text-subtle mb-0.5">Intent</p>
+                          <p className="font-semibold text-navy capitalize">{detail.lead.intent || '—'}</p>
+                        </div>
+                        <div className="bg-beige/60 rounded-lg p-2.5">
+                          <p className="text-[10px] text-subtle mb-0.5">Type</p>
+                          <p className="font-semibold text-navy capitalize">{detail.lead.property_type || '—'}</p>
+                        </div>
+                        <div className="bg-beige/60 rounded-lg p-2.5 col-span-2">
+                          <p className="text-[10px] text-subtle mb-0.5">Budget</p>
+                          <p className="font-semibold text-navy">{detail.lead.budget || '—'}</p>
+                        </div>
+                        <div className="bg-beige/60 rounded-lg p-2.5 col-span-2">
+                          <p className="text-[10px] text-subtle mb-0.5">Location</p>
+                          <p className="font-semibold text-navy">{detail.lead.location_preference || '—'}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-caption text-subtle">Budget</p>
-                      <p className="text-navy">{detail.lead.budget || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-caption text-subtle">Location</p>
-                      <p className="text-navy">{detail.lead.location_preference || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-caption text-subtle">Property type</p>
-                      <p className="text-navy capitalize">
-                        {detail.lead.property_type || '—'}
+
+                    {/* ── AI Scores ── */}
+                    {relationship && (
+                      <div className="px-5 py-4 border-b border-divider">
+                        <p className="text-[10px] font-bold text-placeholder uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <TrendingUp size={11} strokeWidth={2} />
+                          Engagement Scores
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-action-light/50 border border-action/10 rounded-lg p-2 text-center">
+                            <p className="text-[10px] text-action font-bold uppercase">Engage</p>
+                            <p className="text-body-sm font-bold text-navy mt-0.5">{relationship.engagement_score ?? 0}</p>
+                          </div>
+                          <div className="bg-verified-light/50 border border-verified/10 rounded-lg p-2 text-center">
+                            <p className="text-[10px] text-verified font-bold uppercase">Convert</p>
+                            <p className="text-body-sm font-bold text-navy mt-0.5">{relationship.conversion_score ?? 0}</p>
+                          </div>
+                          <div className={`rounded-lg p-2 text-center border ${(relationship.risk_of_churn ?? 0) >= 60 ? 'bg-danger-light/40 border-danger/10' : 'bg-beige/60 border-divider'}`}>
+                            <p className={`text-[10px] font-bold uppercase ${(relationship.risk_of_churn ?? 0) >= 60 ? 'text-danger' : 'text-subtle'}`}>Risk</p>
+                            <p className={`text-body-sm font-bold mt-0.5 ${(relationship.risk_of_churn ?? 0) >= 60 ? 'text-danger' : 'text-navy'}`}>{relationship.risk_of_churn ?? 0}</p>
+                          </div>
+                        </div>
+                        {relationship.next_followup_at && (
+                          <p className="text-[10px] text-subtle mt-2.5 flex items-center gap-1.5">
+                            <Clock size={10} strokeWidth={2} />
+                            Next follow-up: {formatDateTime(relationship.next_followup_at)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── AI Memory summary ── */}
+                    {relationship && (
+                      <div className="px-5 py-4 border-b border-divider">
+                        <p className="text-[10px] font-bold text-placeholder uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Brain size={11} strokeWidth={2} />
+                          AI Memory Summary
+                        </p>
+                        <p className="text-caption text-navy leading-relaxed">
+                          {relationship.relationship_summary || 'No memory captured yet. Memory builds automatically as Propa talks to this user.'}
+                        </p>
+                        {relationship.next_best_action && (
+                          <div className="mt-3 bg-action-light/40 border border-action/10 rounded-lg p-3">
+                            <p className="text-[10px] text-action font-bold uppercase mb-1">Next Best Action</p>
+                            <p className="text-caption text-navy leading-relaxed font-medium">
+                              {relationship.next_best_action}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Human agent note ── */}
+                    <div className="px-5 py-4">
+                      <p className="text-[10px] font-bold text-placeholder uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <PenLine size={11} strokeWidth={2} />
+                        Add Agent Note
                       </p>
+                      <p className="text-[10px] text-subtle mb-2 leading-relaxed">
+                        Log an observation. This is saved permanently to the user&apos;s long-term memory and Propa will reference it on future turns.
+                      </p>
+                      <textarea
+                        value={noteText}
+                        onChange={(e) => { setNoteText(e.target.value); setNoteError(null); setNoteSaved(false) }}
+                        placeholder="e.g. Client said spouse needs to approve before booking. Prefers Saturday viewings."
+                        rows={4}
+                        className="w-full px-3 py-2.5 rounded-lg border border-divider bg-beige/30 text-body-sm text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent resize-none"
+                      />
+                      {noteError && (
+                        <p className="text-[10px] text-danger mt-1 flex items-center gap-1">
+                          <AlertCircle size={10} strokeWidth={2} />
+                          {noteError}
+                        </p>
+                      )}
+                      <button
+                        onClick={saveNote}
+                        disabled={savingNote || !noteText.trim()}
+                        className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-button text-body-sm font-semibold transition-all duration-150 disabled:opacity-50
+                          bg-action text-white hover:bg-action-hover"
+                      >
+                        {savingNote ? (
+                          <RefreshCw size={13} strokeWidth={2} className="animate-spin" />
+                        ) : noteSaved ? (
+                          <CheckCircle2 size={13} strokeWidth={2} />
+                        ) : (
+                          <Save size={13} strokeWidth={2} />
+                        )}
+                        {savingNote ? 'Saving…' : noteSaved ? 'Saved!' : 'Save Note to Memory'}
+                      </button>
                     </div>
+
                   </div>
                 )}
               </aside>
