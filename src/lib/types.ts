@@ -26,8 +26,45 @@ export interface SessionListItem {
   email: string | null
   score: number | null
   intent: string | null
+  relationship_stage?: string | null
+  next_best_action?: string | null
+  risk_of_churn?: number | null
   created_at: string | null
   updated_at: string | null
+}
+
+export interface UserRelationshipProfile {
+  id: string
+  user_id: string
+  active_session_id: string
+  lead_id?: string | null
+  channel?: string | null
+  phone?: string | null
+  profile_name?: string | null
+  assigned_agent_name?: string | null
+  relationship_stage?: string | null
+  intent?: string | null
+  budget?: string | null
+  property_type?: string | null
+  bedrooms?: number | null
+  preferred_locations?: unknown[] | Record<string, unknown> | null
+  timeline?: string | null
+  relationship_summary?: string | null
+  next_best_action?: string | null
+  next_followup_at?: string | null
+  followup_cadence_days?: number | null
+  engagement_score?: number | null
+  conversion_score?: number | null
+  risk_of_churn?: number | null
+  last_user_message_at?: string | null
+  last_agent_message_at?: string | null
+  last_contacted_at?: string | null
+  suppress_memory_until?: string | null
+  reset_count?: number | null
+  opted_out?: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 /** Heuristic pre-waitlist row from GET /leads/waitlist-candidates */
@@ -89,6 +126,7 @@ export interface TakeoverStatus {
 
 export interface ConversationDetail {
   lead: AdkLead
+  relationship?: UserRelationshipProfile | null
   transcript: TranscriptTurn[]
   appointments: BackendAppointment[]
 }
@@ -208,7 +246,7 @@ export interface AdkAgent {
   name: string
   description: string
   category: string
-  status: 'active' | 'paused' | 'error'
+  status: 'active' | 'running' | 'paused' | 'error'
   schedule?: string | null
   last_run?: string | null
   last_result?: string | null

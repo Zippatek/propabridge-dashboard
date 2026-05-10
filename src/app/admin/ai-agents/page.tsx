@@ -10,6 +10,7 @@ import {
   Bot,
   Zap,
   PlayCircle,
+  UserRoundCog,
 } from 'lucide-react'
 import { adk } from '@/lib/client-api'
 import { formatDateTime } from '@/lib/format'
@@ -20,7 +21,7 @@ interface Agent {
   name: string
   description: string
   category: string
-  status: 'active' | 'paused' | 'error'
+  status: 'active' | 'running' | 'paused' | 'error'
   schedule?: string | null
   last_run?: string | null
   last_result?: string | null
@@ -34,6 +35,7 @@ const ICON_MAP: Record<string, typeof Bot> = {
   'send': Send,
   'calendar-clock': CalendarClock,
   'zap': Zap,
+  'user-round-cog': UserRoundCog,
 }
 
 function AgentIcon({ name }: { name?: string }) {
@@ -132,6 +134,8 @@ export default function AdminAiAgentsPage() {
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-badge ${
                           agent.status === 'active'
                             ? 'bg-verified/10 text-verified'
+                            : agent.status === 'running'
+                            ? 'bg-gold/10 text-gold'
                             : agent.status === 'paused'
                             ? 'bg-beige text-subtle'
                             : 'bg-danger/10 text-danger'
@@ -196,18 +200,26 @@ export default function AdminAiAgentsPage() {
                 )}
 
                 {/* Trigger */}
-                <button
-                  onClick={() => trigger(agent.id)}
-                  disabled={triggeringId === agent.id}
-                  className="flex items-center gap-2 text-body-sm font-semibold text-action bg-action-light hover:bg-action hover:text-white border border-action/20 px-4 py-2.5 rounded-button transition-all duration-150 disabled:opacity-50 w-fit"
-                >
-                  {triggeringId === agent.id ? (
-                    <RefreshCw size={14} strokeWidth={2} className="animate-spin" />
-                  ) : (
-                    <PlayCircle size={14} strokeWidth={2} />
-                  )}
-                  {triggeringId === agent.id ? 'Running…' : 'Trigger now'}
-                </button>
+                {agent.id === 'relationship_manager' || agent.category === 'conversational' ? (
+                  <p className="text-caption text-subtle italic">
+                    {agent.id === 'relationship_manager'
+                      ? 'Always-on: updates automatically on every user turn.'
+                      : 'Conversational agent — always on.'}
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => trigger(agent.id)}
+                    disabled={triggeringId === agent.id}
+                    className="flex items-center gap-2 text-body-sm font-semibold text-action bg-action-light hover:bg-action hover:text-white border border-action/20 px-4 py-2.5 rounded-button transition-all duration-150 disabled:opacity-50 w-fit"
+                  >
+                    {triggeringId === agent.id ? (
+                      <RefreshCw size={14} strokeWidth={2} className="animate-spin" />
+                    ) : (
+                      <PlayCircle size={14} strokeWidth={2} />
+                    )}
+                    {triggeringId === agent.id ? 'Running…' : 'Trigger now'}
+                  </button>
+                )}
               </div>
             )
           })}

@@ -20,6 +20,7 @@ import type {
   ConversationDetail,
   TranscriptTurn,
   TakeoverStatus,
+  UserRelationshipProfile,
 } from '@/lib/types'
 import { adk } from '@/lib/client-api'
 import { formatRelativeTime, formatDateTime, scoreClass } from '@/lib/format'
@@ -33,6 +34,9 @@ const MOCK_SESSIONS: SessionListItem[] = [
   {
     id: 'sess-wa-08123456789',
     name: 'Amina Yusuf',
+    relationship_stage: 'hot_lead',
+    next_best_action: 'Escalate and move toward viewing.',
+    risk_of_churn: 12,
     phone: '+2348123456789',
     email: 'amina.y@gmail.com',
     score: 82,
@@ -43,6 +47,9 @@ const MOCK_SESSIONS: SessionListItem[] = [
   {
     id: 'sess-wa-08098765432',
     name: 'Chukwudi Okonkwo',
+    relationship_stage: 'qualified',
+    next_best_action: 'Send relevant matches and ask one next-step question.',
+    risk_of_churn: 28,
     phone: '+2348098765432',
     email: null,
     score: 65,
@@ -53,6 +60,9 @@ const MOCK_SESSIONS: SessionListItem[] = [
   {
     id: 'sess-wa-07034567890',
     name: 'Fatimah Bello',
+    relationship_stage: 'qualifying',
+    next_best_action: 'Explain verification and ask what area/budget they prefer.',
+    risk_of_churn: 45,
     phone: '+2347034567890',
     email: 'fatimah.bello@yahoo.com',
     score: 44,
@@ -62,7 +72,7 @@ const MOCK_SESSIONS: SessionListItem[] = [
   },
 ]
 
-const MOCK_TRANSCRIPTS: Record<string, { lead: ConversationDetail['lead']; transcript: TranscriptTurn[] }> = {
+const MOCK_TRANSCRIPTS: Record<string, { lead: ConversationDetail['lead']; relationship?: UserRelationshipProfile; transcript: TranscriptTurn[] }> = {
   'sess-wa-08123456789': {
     lead: {
       id: 'lead-001',
@@ -74,6 +84,19 @@ const MOCK_TRANSCRIPTS: Record<string, { lead: ConversationDetail['lead']; trans
       budget: '₦45,000,000 – ₦60,000,000',
       property_type: 'detached duplex',
       location_preference: 'Gwarinpa, Abuja',
+    },
+    relationship: {
+      id: 'rel_mock_amina',
+      user_id: '+2348123456789',
+      active_session_id: 'sess-wa-08123456789',
+      assigned_agent_name: 'Propa',
+      relationship_stage: 'hot_lead',
+      relationship_summary: 'Amina wants a 4-bedroom duplex in Gwarinpa around ₦45M–₦60M and is close to booking a viewing.',
+      next_best_action: 'Answer title-document questions and hand off to a human advisor if needed.',
+      engagement_score: 85,
+      conversion_score: 82,
+      risk_of_churn: 12,
+      next_followup_at: new Date(Date.now() + 3600_000 * 24).toISOString(),
     },
     transcript: [
       { author: 'user', content: 'Hi, I\'m looking for a 4-bedroom duplex in Gwarinpa', timestamp: new Date(Date.now() - 3600_000 * 2).toISOString() },
@@ -197,10 +220,12 @@ function useConversationStream(sessionId: string | null, bump = 0) {
         const data = JSON.parse((ev as MessageEvent).data) as {
           transcript: TranscriptTurn[]
           lead: ConversationDetail['lead']
+          relationship?: UserRelationshipProfile | null
         }
         gotRealData.current = true
         setDetail({
           lead: data.lead,
+          relationship: data.relationship || null,
           transcript: data.transcript || [],
           appointments: [],
         })
@@ -213,7 +238,7 @@ function useConversationStream(sessionId: string | null, bump = 0) {
     es.addEventListener('error', () => {
       // Only fall back to mock if we NEVER received real data for this session
       if (es.readyState === EventSource.CLOSED && !gotRealData.current && mockData) {
-        setDetail({ lead: mockData.lead, transcript: mockData.transcript, appointments: [] })
+        setDetail({ lead: mockData.lead, relationship: mockData.relationship || null, transcript: mockData.transcript, appointments: [] })
         setError(null)
       }
     })
@@ -222,7 +247,7 @@ function useConversationStream(sessionId: string | null, bump = 0) {
     const timeout = setTimeout(() => {
       if (!gotRealData.current && mockData) {
         es.close()
-        setDetail({ lead: mockData.lead, transcript: mockData.transcript, appointments: [] })
+        setDetail({ lead: mockData.lead, relationship: mockData.relationship || null, transcript: mockData.transcript, appointments: [] })
       }
     }, 3000)
 
@@ -389,6 +414,8 @@ function ConversationsView() {
   const takeoverSince =
     takeoverStatus?.taken_over_at ?? takeoverStatus?.updated_at ?? null
 
+  const relationship = detail?.relationship || null
+
   const leadPhoneLabel =
     detail?.lead?.phone?.startsWith('web:') === true
       ? 'Web visitor'
@@ -501,11 +528,18 @@ function ConversationsView() {
                     <span className="text-caption text-subtle bg-beige px-1.5 py-0.5 rounded truncate">
                       {String(s.id ?? '').substring(0, 12)}…
                     </span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreClass(s.score)}`}
-                    >
-                      Sc: {s.score ?? 0}
-                    </span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {s.relationship_stage && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-light text-action capitalize">
+                          {s.relationship_stage.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreClass(s.score)}`}
+                      >
+                        Sc: {s.score ?? 0}
+                      </span>
+                    </div>
                   </div>
                 </button>
               )
@@ -537,6 +571,11 @@ function ConversationsView() {
                   <p className="text-caption text-danger max-w-[12rem]" title={takeoverFetchError}>
                     Takeover sync error
                   </p>
+                )}
+                {relationship?.relationship_stage && (
+                  <span className="text-caption font-bold px-2.5 py-1 rounded bg-action-light text-action capitalize">
+                    {relationship.relationship_stage.replace(/_/g, ' ')}
+                  </span>
                 )}
                 {detail?.lead.score != null && (
                   <span
@@ -779,6 +818,61 @@ function ConversationsView() {
                         {detail.lead.email || '—'}
                       </p>
                     </div>
+                    {relationship && (
+                      <>
+                        <div className="rounded-xl border border-action/15 bg-action-light/60 p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-caption text-action uppercase tracking-wider font-bold flex items-center gap-1.5">
+                              <Bot size={13} strokeWidth={1.8} />
+                              Propa Relationship Agent
+                            </p>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-badge bg-white text-action capitalize">
+                              {(relationship.relationship_stage || 'new').replace(/_/g, ' ')}
+                            </span>
+                          </div>
+
+                          <div>
+                            <p className="text-caption text-subtle">Memory Summary</p>
+                            <p className="text-caption text-navy leading-relaxed mt-0.5">
+                              {relationship.relationship_summary || 'No relationship memory captured yet.'}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-caption text-subtle">Next Best Action</p>
+                            <p className="text-caption text-navy font-semibold leading-relaxed mt-0.5">
+                              {relationship.next_best_action || 'Continue qualification.'}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="bg-white border border-divider rounded-lg p-2">
+                              <p className="text-[10px] text-placeholder uppercase font-semibold">Engage</p>
+                              <p className="text-body-sm font-bold text-navy">{relationship.engagement_score ?? 0}</p>
+                            </div>
+                            <div className="bg-white border border-divider rounded-lg p-2">
+                              <p className="text-[10px] text-placeholder uppercase font-semibold">Convert</p>
+                              <p className="text-body-sm font-bold text-navy">{relationship.conversion_score ?? 0}</p>
+                            </div>
+                            <div className="bg-white border border-divider rounded-lg p-2">
+                              <p className="text-[10px] text-placeholder uppercase font-semibold">Risk</p>
+                              <p className={`text-body-sm font-bold ${(relationship.risk_of_churn ?? 0) >= 60 ? 'text-danger' : 'text-navy'}`}>
+                                {relationship.risk_of_churn ?? 0}
+                              </p>
+                            </div>
+                          </div>
+
+                          {relationship.next_followup_at && (
+                            <p className="text-[10px] text-subtle">
+                              Next follow-up: {formatDateTime(relationship.next_followup_at)}
+                            </p>
+                          )}
+                        </div>
+
+                        <hr className="border-divider" />
+                      </>
+                    )}
+
                     <hr className="border-divider" />
 
                     {/* ─── Takeover status in sidebar ─── */}
