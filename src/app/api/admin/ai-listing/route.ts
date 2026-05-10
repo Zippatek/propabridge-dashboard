@@ -18,6 +18,7 @@ export interface AiListingAnswers {
   size_sqm?: string            // built-up area
   declared_plot_size_sqm?: string
   price: string                // asking price NGN
+  year_built?: string          // built-in year
 
   // location
   location: string             // free-text neighbourhood/city description
@@ -83,6 +84,7 @@ export interface AiListingResponse {
     latitude?: number | null
     longitude?: number | null
     units_available?: number | null
+    year_built?: string | null
   }
 }
 
@@ -145,6 +147,7 @@ function buildPrompt(a: AiListingAnswers): string {
     line('Built-up size (sqm)', a.size_sqm),
     line('Plot size (sqm)', a.declared_plot_size_sqm),
     line('Asking price (₦)', a.price),
+    line('Year built', a.year_built),
     line('Payment plan', humanPaymentPlan(a.payment_plan)),
     line('Service charge (₦/yr)', a.service_charge_ngn_per_year),
     line('Construction status', a.construction_status),
@@ -210,7 +213,8 @@ Format your response EXACTLY like this — description first, then the JSON bloc
   "amenities": ["array","of","short","amenity","strings"],
   "latitude": number or null,
   "longitude": number or null,
-  "units_available": number or null
+  "units_available": number or null,
+  "year_built": "string or null — e.g. 2024"
 }
 [/FIELDS]`
 }

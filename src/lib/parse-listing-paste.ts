@@ -39,6 +39,10 @@ const SYNONYMS: SynMap = {
   sqm: 'size_sqm',
   'built up area': 'size_sqm',
   builtup: 'size_sqm',
+  'year built': 'year_built',
+  yearbuilt: 'year_built',
+  'built in': 'year_built',
+  builtin: 'year_built',
   plotsize: 'declared_plot_size_sqm',
   'plot size': 'declared_plot_size_sqm',
   landsize: 'declared_plot_size_sqm',
@@ -258,6 +262,7 @@ function applyPair(rawKey: string, rawVal: string, patch: Partial<AiListingAnswe
     case 'propabridge_commission_pct':
     case 'attribution_window_months':
     case 'size_sqm':
+    case 'year_built':
     case 'declared_plot_size_sqm':
     case 'units_available':
       patch[field] = digitsOnly(val) || val.replace(/,/g, '')

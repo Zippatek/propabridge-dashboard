@@ -213,6 +213,7 @@ const EMPTY_ANSWERS: AiListingAnswers = {
   bathrooms: '',
   size_sqm: '',
   declared_plot_size_sqm: '',
+  year_built: '',
   price: '',
   payment_plan: 'outright',
   service_charge_ngn_per_year: '',
@@ -361,10 +362,11 @@ function QuestionsStep({
           />
         </div>
         <SelectFld label="Intent" value={answers.intent || 'for_sale'} onChange={v => set('intent', v)} options={INTENT_OPTS as readonly (readonly [string, string])[]} cls={selectCls} />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Fld label="Bedrooms" type="number" value={answers.bedrooms} onChange={v => set('bedrooms', v)} cls={inputCls} placeholder="4" />
           <Fld label="Bathrooms" type="number" value={answers.bathrooms} onChange={v => set('bathrooms', v)} cls={inputCls} placeholder="5" />
           <Fld label="Built-up sqm" type="number" value={answers.size_sqm || ''} onChange={v => set('size_sqm', v)} cls={inputCls} placeholder="350" />
+          <Fld label="Built-in (Year)" type="text" value={answers.year_built || ''} onChange={v => set('year_built', v)} cls={inputCls} placeholder="e.g. 2024" />
         </div>
         <Fld label="Plot size (sqm)" type="number" value={answers.declared_plot_size_sqm || ''} onChange={v => set('declared_plot_size_sqm', v)} cls={inputCls} placeholder="600" />
 
@@ -655,6 +657,7 @@ interface ReviewFields {
   bedrooms: string
   bathrooms: string
   size_sqm: string
+  year_built: string
   price: string
   description: string
   amenities: string[]
@@ -790,8 +793,8 @@ function ReviewStep({
           </label>
         </div>
 
-        {/* Beds / Baths / sqm */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Beds / Baths / sqm / Built-in */}
+        <div className="grid grid-cols-4 gap-3">
           <label className="block">
             <span className="text-caption text-subtle font-semibold mb-1.5 block">Beds</span>
             <input className={inputCls} type="number" min={0} value={fields.bedrooms} onChange={e => set('bedrooms', e.target.value)} placeholder="—" />
@@ -803,6 +806,10 @@ function ReviewStep({
           <label className="block">
             <span className="text-caption text-subtle font-semibold mb-1.5 block">sqm</span>
             <input className={inputCls} type="number" min={0} value={fields.size_sqm} onChange={e => set('size_sqm', e.target.value)} placeholder="—" />
+          </label>
+          <label className="block">
+            <span className="text-caption text-subtle font-semibold mb-1.5 block">Built-in</span>
+            <input className={inputCls} type="text" value={fields.year_built} onChange={e => set('year_built', e.target.value)} placeholder="e.g. 2024" />
           </label>
         </div>
 
@@ -862,6 +869,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
     bedrooms: '',
     bathrooms: '',
     size_sqm: '',
+    year_built: '',
     price: '',
     description: '',
     amenities: [],
@@ -897,6 +905,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         bedrooms:      f.bedrooms  != null ? String(f.bedrooms)  : answers.bedrooms,
         bathrooms:     f.bathrooms != null ? String(f.bathrooms) : answers.bathrooms,
         size_sqm:      f.size_sqm  != null ? String(f.size_sqm)  : (answers.size_sqm || ''),
+        year_built:    f.year_built || answers.year_built || '',
         price:         f.price     != null ? String(f.price)     : answers.price,
         description:   data.description,
         amenities:     Array.isArray(f.amenities) && f.amenities.length ? f.amenities : (answers.amenities || []),
@@ -937,6 +946,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         bedrooms:      num(reviewFields.bedrooms),
         bathrooms:     num(reviewFields.bathrooms),
         size_sqm:      num(reviewFields.size_sqm),
+        year_built:    reviewFields.year_built || undefined,
         built_up_area_sqm: num(answers.size_sqm || ''),
         declared_plot_size_sqm: num(answers.declared_plot_size_sqm || ''),
         // commercial
