@@ -63,6 +63,7 @@ function normalizeStage(stage: string) {
 export default function AdminRelationshipsPage() {
   const [profiles, setProfiles] = useState<UserRelationshipProfile[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [backendMissing, setBackendMissing] = useState(false)
   const [stage, setStage] = useState('all')
   const [query, setQuery] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -70,6 +71,7 @@ export default function AdminRelationshipsPage() {
   const load = async () => {
     setRefreshing(true)
     setError(null)
+    setBackendMissing(false)
     const params = new URLSearchParams()
     params.set('limit', '500')
     if (stage !== 'all') params.set('stage', stage)
@@ -79,7 +81,13 @@ export default function AdminRelationshipsPage() {
       )
       setProfiles(data.items || [])
     } catch (e) {
-      setError((e as Error).message)
+      const message = (e as Error).message
+      if (message.toLowerCase().includes('not found') || message.includes('404')) {
+        setProfiles([])
+        setBackendMissing(true)
+      } else {
+        setError(message)
+      }
     } finally {
       setRefreshing(false)
     }
@@ -147,6 +155,16 @@ export default function AdminRelationshipsPage() {
           Refresh
         </button>
       </div>
+
+      {backendMissing && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-body-sm text-amber-900">
+          Relationship Manager UI is installed, but the ADK backend currently deployed behind
+          <code className="mx-1 rounded bg-white/70 px-1">PROPA_ADK_BASE</code>
+          does not expose
+          <code className="mx-1 rounded bg-white/70 px-1">/api/admin/relationship-profiles</code>
+          yet. Redeploy the updated ADK service, then refresh this page.
+        </div>
+      )}
 
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-up">
         <div className="bg-white rounded-card border border-divider shadow-card p-5">
