@@ -84,6 +84,7 @@ export interface TakeoverStatus {
   taken_over_by?: string | null
   taken_over_at?: string | null
   updated_at?: string | null
+  auto_sent?: boolean
 }
 
 export interface ConversationDetail {

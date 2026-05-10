@@ -352,11 +352,16 @@ function ConversationsView() {
   const {
     status: takeoverStatus,
     loading: takeoverLoading,
-    takeover,
+    takeover: rawTakeover,
     release,
     refresh: refreshTakeover,
     fetchError: takeoverFetchError,
   } = useTakeoverStatus(selectedId)
+
+  const takeover = async () => {
+    await rawTakeover()
+    setConversationBump((prev) => prev + 1)
+  }
   const [filter, setFilter] = useState('')
   const [sendBody, setSendBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -572,6 +577,11 @@ function ConversationsView() {
                   </p>
                   <p className="text-caption text-[#7a5a10]">
                     AI is paused. Messages are sent as a human agent via WhatsApp.
+                    {takeoverStatus?.auto_sent && (
+                      <span className="block mt-0.5 font-medium text-[#5d3e02]">
+                        ✓ Takeover welcome message automatically sent to the lead.
+                      </span>
+                    )}
                     {takeoverSince && <> · Since {formatDateTime(takeoverSince)}</>}
                   </p>
                 </div>
