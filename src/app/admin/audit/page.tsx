@@ -514,10 +514,10 @@ export default function AdminAuditPage() {
                     Auto-fix all (in scope)
                   </button>
                   <Link
-                    href={`/admin/listings?focus=${r.property_id}`}
+                    href={`/admin/listings/${r.property_id}/edit`}
                     className="flex items-center gap-1 text-caption text-action hover:underline"
                   >
-                    Open <ExternalLink size={11} />
+                    Edit <ExternalLink size={11} />
                   </Link>
                 </div>
               </div>

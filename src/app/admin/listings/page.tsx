@@ -9,92 +9,23 @@ import {
   StarOff,
   Pencil,
   X,
-  Check,
   ExternalLink,
-  ChevronDown,
   Home,
   Plus,
   Sparkles,
   Trash2,
   GripVertical,
-  Upload,
   Send,
   FileText,
   Loader2,
-  Wand2,
+  Check,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
-import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
+import { normalizeListingType } from '@/lib/listing-type'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 import AddListingDrawer from '@/components/admin/AddListingDrawer'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Listing {
-  id: string
-  title?: string
-  slug?: string
-  city?: string
-  listing_type?: string
-  property_type?: string
-  bedrooms?: number | null
-  bathrooms?: number | null
-  size_sqm?: number | null
-  price?: number | null
-  previous_price?: number | null
-  cover_image_url?: string | null
-  featured?: boolean
-  verification_status?: string
-  agency_name?: string
-  agency_id?: string
-  created_at?: string
-  updated_at?: string
-  // Extended structured fields surfaced in the Edit drawer.
-  description?: string | null
-  neighborhood?: string | null
-  address?: string | null
-  payment_plan?: string | null
-  service_charge_ngn_per_year?: number | null
-  propabridge_commission_pct?: number | null
-  attribution_window_months?: number | null
-  selling_entity_type?: string | null
-  selling_entity_legal_name?: string | null
-  cac_rc_number?: string | null
-  power_supply?: string | null
-  water_supply?: string | null
-  sewage?: string | null
-  road_access?: string | null
-  is_estate_unit?: boolean | null
-  estate_name?: string | null
-  construction_status?: string | null
-  condition?: string | null
-  built_up_area_sqm?: number | null
-  declared_plot_size_sqm?: number | null
-  intent?: string | null
-  amenities?: string[] | null
-  images?: string[] | null
-  units_available?: number | null
-  year_built?: number | null
-  cadastral_zone?: string | null
-  plot_number?: string | null
-  latitude?: number | null
-  longitude?: number | null
-  polygon_geojson?: string | null
-  title_type?: string | null
-  title_file_no?: string | null
-  title_holder_name?: string | null
-  title_issued_date?: string | null
-  title_issuing_authority?: string | null
-}
-
-const CONSTRUCTION_STATUS_OPTS = [
-  ['', '—'],
-  ['finished', 'Finished'],
-  ['semi_finished', 'Semi-finished'],
-  ['under_construction', 'Under construction'],
-  ['off_plan', 'Off-plan'],
-  ['plots', 'Plots / land'],
-] as const
+import { AdminListing } from '@/lib/types'
+import { ListingEditForm } from '@/components/admin/ListingEditForm'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -170,402 +101,20 @@ function StatusPill({ status }: { status?: string }) {
 // ─── Edit Drawer ─────────────────────────────────────────────────────────────
 
 interface EditDrawerProps {
-  listing: Listing
+  listing: AdminListing
   onClose: () => void
-  onSaved: (updated: Listing) => void
-}
-
-const PROPERTY_TYPES = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
-const VERIFY_STATUSES = ['draft', 'submitted', 'in_review', 'needs_info', 'verified', 'rejected']
-
-// Multi-image manager — drag-to-reorder, mark cover, delete, upload more.
-// Persists via PUT /listings/:id/images (replaces full ordered list).
-interface ImageItem { url: string; is_cover: boolean }
-
-// Per-image enhance state: null = idle, 'loading' = enhancing, string = enhanced data URL
-type EnhanceState = null | 'loading' | string
-
-function ImageManager({
-  listingId,
-  initial,
-  onPersisted,
-}: {
-  listingId: string
-  initial: ImageItem[]
-  onPersisted: (imgs: ImageItem[]) => void
-}) {
-  const [items, setItems] = useState<ImageItem[]>(initial)
-  const [uploading, setUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [enhanceStates, setEnhanceStates] = useState<EnhanceState[]>(() => initial.map(() => null))
-  const dragIdx = useRef<number | null>(null)
-
-  const persist = async (next: ImageItem[]) => {
-    // Keep enhanceStates in sync: pad/trim to match new items length
-    setEnhanceStates(prev => {
-      const padded = [...prev]
-      while (padded.length < next.length) padded.push(null)
-      return padded.slice(0, next.length)
-    })
-    setItems(next)
-    setSaving(true)
-    setErr(null)
-    try {
-      await be.send(`/listings/${listingId}/images`, 'PUT', { images: next })
-      onPersisted(next)
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const onDragStart = (i: number) => { dragIdx.current = i }
-  const onDragOver = (e: React.DragEvent) => e.preventDefault()
-  const onDrop = (i: number) => {
-    const from = dragIdx.current
-    dragIdx.current = null
-    if (from === null || from === i) return
-    const next = [...items]
-    const [moved] = next.splice(from, 1)
-    next.splice(i, 0, moved)
-    persist(next)
-  }
-
-  const setCover = (i: number) => {
-    const next = items.map((it, j) => ({ ...it, is_cover: j === i }))
-    persist(next)
-  }
-  const remove = (i: number) => {
-    const next = items.filter((_, j) => j !== i)
-    if (next.length > 0 && !next.some(it => it.is_cover)) next[0].is_cover = true
-    persist(next)
-  }
-
-  const enhanceImage = async (i: number) => {
-    setEnhanceStates(prev => { const n = [...prev]; n[i] = 'loading'; return n })
-    setErr(null)
-    try {
-      const res = await fetch('/api/admin/enhance-image', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ imageUrl: items[i].url }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || `Enhancement failed (${res.status})`)
-      setEnhanceStates(prev => { const n = [...prev]; n[i] = json.enhancedImageUrl as string; return n })
-    } catch (e) {
-      setErr((e as Error).message)
-      setEnhanceStates(prev => { const n = [...prev]; n[i] = null; return n })
-    }
-  }
-
-  const acceptEnhancement = (i: number) => {
-    const enhanced = enhanceStates[i]
-    if (!enhanced || enhanced === 'loading') return
-    const next = items.map((it, j) => j === i ? { ...it, url: enhanced } : it)
-    setEnhanceStates(prev => { const n = [...prev]; n[i] = null; return n })
-    persist(next)
-  }
-
-  const discardEnhancement = (i: number) => {
-    setEnhanceStates(prev => { const n = [...prev]; n[i] = null; return n })
-  }
-
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    setUploading(true); setErr(null)
-    const next = [...items]
-    try {
-      for (const file of Array.from(files)) {
-        const fd = new FormData()
-        fd.append('file', file)
-        const res = await fetch('/api/admin/upload-image', { method: 'POST', credentials: 'same-origin', body: fd })
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || `Upload failed (${res.status})`)
-        }
-        const { url } = await res.json()
-        next.push({ url, is_cover: next.length === 0 })
-      }
-      await persist(next)
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-caption text-subtle font-semibold">Photos · drag to reorder</span>
-        {saving && <span className="text-[10px] text-action flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> saving</span>}
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        {items.map((it, i) => {
-          const es = enhanceStates[i] ?? null
-          const isEnhancing = es === 'loading'
-          const hasEnhanced = es !== null && es !== 'loading'
-          return (
-            <div key={it.url + i} className="flex flex-col gap-1">
-              <div
-                draggable
-                onDragStart={() => onDragStart(i)}
-                onDragOver={onDragOver}
-                onDrop={() => onDrop(i)}
-                className="relative group rounded-input overflow-hidden border border-divider aspect-[4/3] cursor-move bg-beige"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={it.url} alt={`#${i + 1}`} className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => setCover(i)}
-                  title={it.is_cover ? 'Cover image' : 'Mark as cover'}
-                  className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-opacity ${it.is_cover ? 'bg-action text-white opacity-100' : 'bg-white/85 text-navy opacity-0 group-hover:opacity-100'
-                    }`}
-                >
-                  {it.is_cover ? 'Cover' : 'Set cover'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove(i)}
-                  className="absolute top-1 right-1 bg-navy/70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove"
-                >
-                  <Trash2 size={11} />
-                </button>
-              </div>
-              {/* Enhance with AI */}
-              {!hasEnhanced ? (
-                <button
-                  type="button"
-                  onClick={() => enhanceImage(i)}
-                  disabled={isEnhancing}
-                  className="flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
-                >
-                  {isEnhancing
-                    ? <><Loader2 size={9} className="animate-spin" /> Enhancing…</>
-                    : <><Wand2 size={9} /> Enhance</>}
-                </button>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {/* Before / After preview */}
-                  <div className="grid grid-cols-2 gap-1">
-                    <div className="relative rounded overflow-hidden aspect-[4/3] border border-divider">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={it.url} alt="Before" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0 left-0 right-0 text-center bg-navy/60 text-white text-[9px] py-0.5">Before</span>
-                    </div>
-                    <div className="relative rounded overflow-hidden aspect-[4/3] border border-action">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={es} alt="Enhanced" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0 left-0 right-0 text-center bg-action/80 text-white text-[9px] py-0.5">Enhanced</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => acceptEnhancement(i)}
-                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-action text-white hover:bg-action-hover transition-colors"
-                    >
-                      <Check size={9} /> Use enhanced
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => discardEnhancement(i)}
-                      className="flex items-center justify-center px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-danger transition-colors"
-                    >
-                      <X size={9} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
-        <label className={`flex flex-col items-center justify-center rounded-input border-2 border-dashed aspect-[4/3] cursor-pointer transition-colors ${uploading ? 'border-action bg-action-light/20 opacity-60' : 'border-divider hover:border-action hover:bg-beige/30'}`}>
-          {uploading
-            ? <Loader2 size={18} className="text-action animate-spin" strokeWidth={1.5} />
-            : <Upload size={18} className="text-subtle mb-1" strokeWidth={1.5} />}
-          <span className="text-caption text-subtle">{uploading ? 'Uploading…' : 'Add'}</span>
-          <input
-            type="file" multiple accept="image/*" className="hidden"
-            disabled={uploading}
-            onChange={e => { handleFiles(e.target.files); e.target.value = '' }}
-          />
-        </label>
-      </div>
-      {err && <p className="text-[11px] text-danger mt-2">{err}</p>}
-    </div>
-  )
+  onSaved: (updated: AdminListing) => void
 }
 
 function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
-  const initialImages: ImageItem[] = (() => {
-    const arr = Array.isArray(listing.images) ? listing.images : []
-    if (arr.length === 0 && listing.cover_image_url) return [{ url: listing.cover_image_url, is_cover: true }]
-    return arr.map((url, i) => ({ url, is_cover: listing.cover_image_url ? url === listing.cover_image_url : i === 0 }))
-  })()
-
-  const [form, setForm] = useState({
-    title: listing.title || '',
-    description: listing.description || '',
-    city: listing.city || '',
-    neighborhood: listing.neighborhood || '',
-    address: listing.address || '',
-    price: listing.price ? String(listing.price) : '',
-    listing_type: normalizeListingType(listing.listing_type),
-    property_type: listing.property_type || 'apartment',
-    intent: listing.intent || '',
-    bedrooms: listing.bedrooms != null ? String(listing.bedrooms) : '',
-    bathrooms: listing.bathrooms != null ? String(listing.bathrooms) : '',
-    size_sqm: listing.size_sqm != null ? String(listing.size_sqm) : '',
-    built_up_area_sqm: listing.built_up_area_sqm != null ? String(listing.built_up_area_sqm) : '',
-    declared_plot_size_sqm: listing.declared_plot_size_sqm != null ? String(listing.declared_plot_size_sqm) : '',
-    slug: listing.slug || '',
-    featured: listing.featured || false,
-    verification_status: listing.verification_status || 'draft',
-    payment_plan: listing.payment_plan || '',
-    service_charge_ngn_per_year: listing.service_charge_ngn_per_year != null ? String(listing.service_charge_ngn_per_year) : '',
-    propabridge_commission_pct: listing.propabridge_commission_pct != null ? String(listing.propabridge_commission_pct) : '',
-    attribution_window_months: listing.attribution_window_months != null ? String(listing.attribution_window_months) : '',
-    selling_entity_type: listing.selling_entity_type || '',
-    selling_entity_legal_name: listing.selling_entity_legal_name || '',
-    cac_rc_number: listing.cac_rc_number || '',
-    power_supply: listing.power_supply || '',
-    water_supply: listing.water_supply || '',
-    sewage: listing.sewage || '',
-    road_access: listing.road_access || '',
-    construction_status: listing.construction_status || '',
-    condition: listing.condition || '',
-    is_estate_unit: !!listing.is_estate_unit,
-    estate_name: listing.estate_name || '',
-    amenities: Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
-    units_available: listing.units_available != null ? String(listing.units_available) : '',
-    year_built: listing.year_built != null ? String(listing.year_built) : '',
-    latitude: listing.latitude != null ? String(listing.latitude) : '',
-    longitude: listing.longitude != null ? String(listing.longitude) : '',
-    cadastral_zone: listing.cadastral_zone || '',
-    plot_number: listing.plot_number || '',
-    polygon_geojson: listing.polygon_geojson || '',
-    title_type: listing.title_type || '',
-    title_file_no: listing.title_file_no || '',
-    title_holder_name: listing.title_holder_name || '',
-    title_issued_date: listing.title_issued_date || '',
-    title_issuing_authority: listing.title_issuing_authority || '',
-  })
-  const [images, setImages] = useState<ImageItem[]>(initialImages)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const set = (k: string, v: unknown) => setForm(p => ({ ...p, [k]: v }))
-
-  const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
-
-  const handleSave = async () => {
-    setSaving(true)
-    setErr(null)
-    try {
-      const payload: Record<string, unknown> = {
-        title: form.title || undefined,
-        description: form.description || undefined,
-        city: form.city || undefined,
-        neighborhood: form.neighborhood || undefined,
-        address: form.address || undefined,
-        slug: form.slug || undefined,
-        listing_type: normalizeListingType(form.listing_type),
-        property_type: form.property_type,
-        intent: form.intent || undefined,
-        featured: form.featured,
-        verification_status: form.verification_status,
-        payment_plan: form.payment_plan || undefined,
-        selling_entity_type: form.selling_entity_type || undefined,
-        selling_entity_legal_name: form.selling_entity_legal_name || undefined,
-        cac_rc_number: form.cac_rc_number || undefined,
-        power_supply: form.power_supply || undefined,
-        water_supply: form.water_supply || undefined,
-        sewage: form.sewage || undefined,
-        road_access: form.road_access || undefined,
-        construction_status: form.construction_status || undefined,
-        condition: form.condition || undefined,
-        is_estate_unit: form.is_estate_unit,
-        estate_name: form.is_estate_unit ? (form.estate_name || undefined) : undefined,
-        price: num(form.price),
-        bedrooms: num(form.bedrooms),
-        bathrooms: num(form.bathrooms),
-        size_sqm: num(form.size_sqm),
-        built_up_area_sqm: num(form.built_up_area_sqm),
-        declared_plot_size_sqm: num(form.declared_plot_size_sqm),
-        service_charge_ngn_per_year: num(form.service_charge_ngn_per_year),
-        propabridge_commission_pct: num(form.propabridge_commission_pct),
-        attribution_window_months: num(form.attribution_window_months),
-        latitude: num(form.latitude),
-        longitude: num(form.longitude),
-        cadastral_zone: form.cadastral_zone || undefined,
-        plot_number: form.plot_number || undefined,
-        // polygon_geojson is a TEXT column — send the raw string as-is (not parsed)
-        polygon_geojson: (form.polygon_geojson as string)?.trim() || undefined,
-        title_type: form.title_type || undefined,
-        title_file_no: form.title_file_no || undefined,
-        title_holder_name: form.title_holder_name || undefined,
-        title_issued_date: form.title_issued_date || undefined,
-        title_issuing_authority: form.title_issuing_authority || undefined,
-        amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
-        units_available: num(form.units_available as string),
-        year_built: num(form.year_built as string),
-      }
-      // Strip keys with undefined/null values so the backend never sees them
-      for (const k of Object.keys(payload)) {
-        if (payload[k] === undefined || payload[k] === null) delete payload[k]
-      }
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
-      onSaved({
-        ...listing,
-        ...updated,
-        images: images.map(i => i.url),
-        cover_image_url: (images.find(i => i.is_cover) || images[0])?.url ?? null,
-      })
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const toggleDraft = async () => {
-    const nextStatus = form.verification_status === 'draft' ? 'submitted' : 'draft'
-    set('verification_status', nextStatus)
-    try {
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', { verification_status: nextStatus })
-      onSaved({ ...listing, ...updated, verification_status: nextStatus })
-    } catch (e) {
-      setErr((e as Error).message)
-      set('verification_status', form.verification_status)
-    }
-  }
-
-  const inputCls =
-    'w-full px-3 py-2.5 rounded-input border border-divider bg-white text-navy text-body-sm ' +
-    'focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent transition-all duration-150 placeholder-placeholder'
-
-  const selectCls =
-    'w-full px-3 py-2.5 rounded-input border border-divider bg-white text-navy text-body-sm ' +
-    'focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent transition-all duration-150 appearance-none'
-
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 bg-navy/30 backdrop-blur-sm z-40 animate-fade-up"
         onClick={onClose}
       />
-      {/* Drawer */}
       <div className="fixed right-0 top-0 h-full w-full max-w-[440px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-left">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-divider">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-divider flex-shrink-0">
           <div>
             <p className="text-caption text-subtle uppercase tracking-wide font-semibold">Edit Listing</p>
             <h3 className="text-h4 text-navy mt-0.5 line-clamp-1">{listing.title || 'Untitled'}</h3>
@@ -578,371 +127,8 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
           </button>
         </div>
 
-        {/* Body — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {/* Images manager */}
-          <ImageManager
-            listingId={listing.id}
-            initial={images}
-            onPersisted={setImages}
-          />
-
-          {/* Title */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Title</span>
-            <input className={inputCls} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Listing title" />
-          </label>
-
-          {/* City + Slug */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">City</span>
-              <input className={inputCls} value={form.city} onChange={e => set('city', e.target.value)} placeholder="e.g. Abuja" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Slug</span>
-              <input className={inputCls} value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="url-slug" />
-            </label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Neighborhood</span>
-              <input className={inputCls} value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="e.g. Wuse 2" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Address</span>
-              <input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} placeholder="Plot / street" />
-            </label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Latitude</span>
-              <input className={inputCls} value={form.latitude} onChange={e => set('latitude', e.target.value)} placeholder="e.g. 9.0765" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Longitude</span>
-              <input className={inputCls} value={form.longitude} onChange={e => set('longitude', e.target.value)} placeholder="e.g. 7.3986" />
-            </label>
-          </div>
-
-          <details className="group">
-            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Advanced location</summary>
-            <div className="pt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Cadastral Zone</span>
-                  <input className={inputCls} value={form.cadastral_zone} onChange={e => set('cadastral_zone', e.target.value)} placeholder="e.g. B09" />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Plot Number</span>
-                  <input className={inputCls} value={form.plot_number} onChange={e => set('plot_number', e.target.value)} placeholder="e.g. 1234" />
-                </label>
-              </div>
-              <label className="block">
-                <span className="text-caption text-subtle font-semibold mb-1.5 block">Polygon GeoJSON</span>
-                <textarea
-                  className={`${inputCls} font-mono resize-none`}
-                  rows={3}
-                  value={form.polygon_geojson}
-                  onChange={e => set('polygon_geojson', e.target.value)}
-                  placeholder='{"type":"Polygon","coordinates":[[...]]}'
-                />
-              </label>
-            </div>
-          </details>
-
-          {/* Price */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Price (₦)</span>
-            <input
-              className={inputCls}
-              type="number"
-              min={0}
-              value={form.price}
-              onChange={e => set('price', e.target.value)}
-              placeholder="e.g. 45000000"
-            />
-            {form.price && (
-              <p className="text-[11px] text-action mt-1">{formatPrice(Number(form.price))}</p>
-            )}
-          </label>
-
-          <details className="group">
-            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Title & Legal</summary>
-            <div className="pt-3 space-y-3">
-              <label className="block">
-                <span className="text-caption text-subtle font-semibold mb-1.5 block">Title Type</span>
-                <div className="relative">
-                  <select className={selectCls} value={form.title_type} onChange={e => set('title_type', e.target.value)}>
-                    <option value="">— Select —</option>
-                    <option value="c_of_o">Certificate of Occupancy (C of O)</option>
-                    <option value="r_of_o">Right of Occupancy (R of O)</option>
-                    <option value="governors_consent">Governor's Consent</option>
-                    <option value="deed_of_assignment">Deed of Assignment</option>
-                    <option value="customary">Customary</option>
-                    <option value="allocation_letter">Allocation Letter</option>
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
-                </div>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Title File No.</span>
-                  <input className={inputCls} value={form.title_file_no} onChange={e => set('title_file_no', e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Title Issued Date</span>
-                  <input className={inputCls} type="date" value={form.title_issued_date} onChange={e => set('title_issued_date', e.target.value)} />
-                </label>
-              </div>
-              <label className="block">
-                <span className="text-caption text-subtle font-semibold mb-1.5 block">Title Holder Name</span>
-                <input className={inputCls} value={form.title_holder_name} onChange={e => set('title_holder_name', e.target.value)} />
-              </label>
-              <label className="block">
-                <span className="text-caption text-subtle font-semibold mb-1.5 block">Issuing Authority</span>
-                <input className={inputCls} value={form.title_issuing_authority} onChange={e => set('title_issuing_authority', e.target.value)} />
-              </label>
-            </div>
-          </details>
-
-          {/* Listing Type + Property Type */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Listing type</span>
-              <div className="relative">
-                <select className={selectCls} value={form.listing_type} onChange={e => set('listing_type', e.target.value)}>
-                  {LISTING_TYPES_DB.map(t => (
-                    <option key={t} value={t}>
-                      {t === 'sale' ? 'Sale' : 'Rent'}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
-              </div>
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Property type</span>
-              <div className="relative">
-                <select className={selectCls} value={form.property_type} onChange={e => set('property_type', e.target.value)}>
-                  {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
-              </div>
-            </label>
-          </div>
-
-          {/* Beds / Baths / sqm */}
-          <div className="grid grid-cols-3 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Beds</span>
-              <input className={inputCls} type="number" min={0} value={form.bedrooms} onChange={e => set('bedrooms', e.target.value)} placeholder="—" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Baths</span>
-              <input className={inputCls} type="number" min={0} value={form.bathrooms} onChange={e => set('bathrooms', e.target.value)} placeholder="—" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">sqm</span>
-              <input className={inputCls} type="number" min={0} value={form.size_sqm} onChange={e => set('size_sqm', e.target.value)} placeholder="—" />
-            </label>
-          </div>
-
-          {/* Verification status */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Verification status</span>
-            <div className="relative">
-              <select className={selectCls} value={form.verification_status} onChange={e => set('verification_status', e.target.value)}>
-                {VERIFY_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
-            </div>
-          </label>
-
-          {/* Construction status */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Construction status</span>
-              <div className="relative">
-                <select className={selectCls} value={form.construction_status} onChange={e => set('construction_status', e.target.value)}>
-                  {CONSTRUCTION_STATUS_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
-              </div>
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Year built</span>
-              <input className={inputCls} type="number" value={form.year_built} onChange={e => set('year_built', e.target.value)} placeholder="e.g. 2024" />
-            </label>
-          </div>
-
-          <details className="group">
-            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Pricing & Terms</summary>
-            <div className="pt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Payment plan</span>
-                  <input className={inputCls} value={form.payment_plan} onChange={e => set('payment_plan', e.target.value)} placeholder="outright / installment…" />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Service charge (₦/yr)</span>
-                  <input className={inputCls} type="number" value={form.service_charge_ngn_per_year} onChange={e => set('service_charge_ngn_per_year', e.target.value)} placeholder="0" />
-                </label>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Commission (%)</span>
-                  <input className={inputCls} type="number" value={form.propabridge_commission_pct} onChange={e => set('propabridge_commission_pct', e.target.value)} placeholder="5" />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Attribution (months)</span>
-                  <input className={inputCls} type="number" value={form.attribution_window_months} onChange={e => set('attribution_window_months', e.target.value)} placeholder="12" />
-                </label>
-              </div>
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Seller</summary>
-            <div className="pt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Selling entity type</span>
-                  <input className={inputCls} value={form.selling_entity_type} onChange={e => set('selling_entity_type', e.target.value)} placeholder="developer / agent…" />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">CAC RC #</span>
-                  <input className={inputCls} value={form.cac_rc_number} onChange={e => set('cac_rc_number', e.target.value)} />
-                </label>
-              </div>
-              <label className="block">
-                <span className="text-caption text-subtle font-semibold mb-1.5 block">Selling entity legal name</span>
-                <input className={inputCls} value={form.selling_entity_legal_name} onChange={e => set('selling_entity_legal_name', e.target.value)} />
-              </label>
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Utilities & Condition</summary>
-            <div className="pt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Power</span>
-                  <input className={inputCls} value={form.power_supply} onChange={e => set('power_supply', e.target.value)} placeholder="grid / solar…" />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Water</span>
-                  <input className={inputCls} value={form.water_supply} onChange={e => set('water_supply', e.target.value)} placeholder="mains / borehole…" />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Sewage</span>
-                  <input className={inputCls} value={form.sewage} onChange={e => set('sewage', e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Road access</span>
-                  <input className={inputCls} value={form.road_access} onChange={e => set('road_access', e.target.value)} />
-                </label>
-              </div>
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Amenities & Narrative</summary>
-            <div className="pt-3 space-y-3">
-              <label className="block">
-                <span className="text-caption text-subtle font-semibold mb-1.5 block">Amenities (comma-separated)</span>
-                <input className={inputCls} value={form.amenities} onChange={e => set('amenities', e.target.value)} placeholder="Pool, Gym, 24hr Security" />
-              </label>
-            </div>
-          </details>
-
-          {/* Units available */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Units available</span>
-            <input
-              className={inputCls}
-              type="number"
-              min={0}
-              value={(form as Record<string, unknown>).units_available as string ?? ''}
-              onChange={e => set('units_available', e.target.value)}
-              placeholder="e.g. 12 (leave blank if N/A)"
-            />
-          </label>
-
-          {/* Description */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Description (Markdown)</span>
-            <textarea
-              className={`${inputCls} font-mono resize-none`}
-              rows={6}
-              value={form.description}
-              onChange={e => set('description', e.target.value)}
-              placeholder="Buyer-facing description…"
-            />
-          </label>
-
-          {/* Draft / Publish toggle */}
-          <button
-            onClick={toggleDraft}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-button text-body-sm font-semibold transition-colors ${form.verification_status === 'draft'
-                ? 'bg-action text-white hover:bg-action-hover'
-                : 'bg-beige text-navy hover:bg-divider/50 border border-divider'
-              }`}
-          >
-            {form.verification_status === 'draft'
-              ? <><Send size={14} strokeWidth={2.2} /> Publish (move to submitted)</>
-              : <><FileText size={14} strokeWidth={2.2} /> Move to draft</>}
-          </button>
-
-          {/* Featured toggle */}
-          <div className="flex items-center justify-between bg-beige rounded-card px-4 py-3 border border-divider">
-            <div>
-              <p className="text-body-sm text-navy font-semibold">Featured listing</p>
-              <p className="text-caption text-subtle">Pinned to homepage and search top</p>
-            </div>
-            <button
-              onClick={() => set('featured', !form.featured)}
-              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${form.featured ? 'bg-action' : 'bg-divider'}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${form.featured ? 'translate-x-5' : 'translate-x-0'}`}
-              />
-            </button>
-          </div>
-
-          {/* Agency (read-only) */}
-          {listing.agency_name && (
-            <div className="bg-beige rounded-card px-4 py-3 border border-divider">
-              <p className="text-caption text-subtle font-semibold mb-0.5">Agency</p>
-              <p className="text-body-sm text-navy">{listing.agency_name}</p>
-            </div>
-          )}
-
-          {err && (
-            <div className="bg-danger-light border border-danger/20 text-danger text-body-sm rounded-card px-4 py-3">
-              {err}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-divider flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 bg-action hover:bg-action-hover text-white font-semibold py-3 rounded-button transition-all duration-150 disabled:opacity-50"
-          >
-            <Check size={15} strokeWidth={2.5} />
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-5 py-3 rounded-button border border-divider text-subtle hover:text-navy hover:bg-beige text-body-sm font-semibold transition-all duration-150"
-          >
-            Cancel
-          </button>
+        <div className="flex-1 overflow-hidden">
+          <ListingEditForm listing={listing} onSaved={onSaved} onCancel={onClose} />
         </div>
       </div>
     </>
@@ -964,9 +150,9 @@ function RewriteDrawer({
   onClose,
   onApplied,
 }: {
-  listing: Listing
+  listing: AdminListing
   onClose: () => void
-  onApplied: (updated: Listing) => void
+  onApplied: (updated: AdminListing) => void
 }) {
   const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(false)
@@ -1006,7 +192,7 @@ function RewriteDrawer({
         result.summary,
         result.search_keywords || [],
       )
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
+      const updated = await be.send<AdminListing>(`/listings/${listing.id}`, 'PATCH', payload)
       // Best-effort embedding refresh — never blocks upstream 404/501.
       // Proxy: /api/admin/be/<path> → api-gateway /<path> (same prefix as /listings).
       fetch(`/api/admin/be/properties/${listing.id}/embed`, {
@@ -1105,15 +291,15 @@ function RewriteDrawer({
 const STATUS_FILTERS = ['all', 'verified', 'submitted', 'in_review', 'needs_info', 'draft', 'rejected']
 
 export default function AdminListingsPage() {
-  const [listings, setListings] = useState<Listing[] | null>(null)
+  const [listings, setListings] = useState<AdminListing[] | null>(null)
   const [total, setTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatus] = useState('all')
-  const [editTarget, setEditTarget] = useState<Listing | null>(null)
+  const [editTarget, setEditTarget] = useState<AdminListing | null>(null)
   const [togglingId, setToggling] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
-  const [rewriteTarget, setRewriteTarget] = useState<Listing | null>(null)
+  const [rewriteTarget, setRewriteTarget] = useState<AdminListing | null>(null)
   const [rewriteSavedToast, setRewriteSavedToast] = useState(false)
 
   const [bucketOrphans, setBucketOrphans] = useState<
@@ -1134,7 +320,7 @@ export default function AdminListingsPage() {
       .then(d => {
         // Backend returns { success, count, data[] } — normalize to expected shape
         const raw = ((d.items || d.data || []) as Record<string, unknown>[])
-        const items: Listing[] = raw.map(item => ({
+        const items: AdminListing[] = raw.map(item => ({
           id: String(item.id ?? ''),
           title: item.title as string | undefined,
           slug: item.slug as string | undefined,
@@ -1211,7 +397,7 @@ export default function AdminListingsPage() {
     load(search, s)
   }
 
-  const toggleFeatured = async (l: Listing) => {
+  const toggleFeatured = async (l: AdminListing) => {
     setToggling(l.id)
     try {
       await be.send(`/listings/${l.id}`, 'PATCH', { featured: !l.featured })
@@ -1223,11 +409,11 @@ export default function AdminListingsPage() {
     }
   }
 
-  const upsertListingRow = useCallback((updated: Listing) => {
+  const upsertListingRow = useCallback((updated: AdminListing) => {
     setListings(prev => prev?.map(x => x.id === updated.id ? { ...x, ...updated } : x) ?? null)
   }, [])
 
-  const handleSaved = (updated: Listing) => {
+  const handleSaved = (updated: AdminListing) => {
     upsertListingRow(updated)
     setEditTarget(null)
   }
@@ -1238,7 +424,7 @@ export default function AdminListingsPage() {
     return () => clearTimeout(t)
   }, [rewriteSavedToast])
 
-  const deleteListing = async (l: Listing) => {
+  const deleteListing = async (l: AdminListing) => {
     if (!confirm('Delete this listing? This cannot be undone.')) return
     try {
       await be.send(`/listings/${l.id}`, 'DELETE', undefined)
@@ -1249,7 +435,7 @@ export default function AdminListingsPage() {
     }
   }
 
-  const toggleDraft = async (l: Listing) => {
+  const toggleDraft = async (l: AdminListing) => {
     const next = l.verification_status === 'draft' ? 'submitted' : 'draft'
     setToggling(l.id)
     try {

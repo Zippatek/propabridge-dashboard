@@ -218,6 +218,63 @@ export interface BackendListing {
   [key: string]: unknown
 }
 
+export interface AdminListing {
+  id: string
+  title?: string
+  slug?: string
+  city?: string
+  listing_type?: string
+  property_type?: string
+  bedrooms?: number | null
+  bathrooms?: number | null
+  size_sqm?: number | null
+  price?: number | null
+  previous_price?: number | null
+  cover_image_url?: string | null
+  featured?: boolean
+  verification_status?: string
+  agency_name?: string
+  agency_id?: string
+  created_at?: string
+  updated_at?: string
+  // Extended structured fields surfaced in the Edit drawer.
+  description?: string | null
+  neighborhood?: string | null
+  address?: string | null
+  payment_plan?: string | null
+  service_charge_ngn_per_year?: number | null
+  propabridge_commission_pct?: number | null
+  attribution_window_months?: number | null
+  selling_entity_type?: string | null
+  selling_entity_legal_name?: string | null
+  cac_rc_number?: string | null
+  power_supply?: string | null
+  water_supply?: string | null
+  sewage?: string | null
+  road_access?: string | null
+  is_estate_unit?: boolean | null
+  estate_name?: string | null
+  construction_status?: string | null
+  condition?: string | null
+  built_up_area_sqm?: number | null
+  declared_plot_size_sqm?: number | null
+  intent?: string | null
+  amenities?: string[] | null
+  images?: string[] | null
+  units_available?: number | null
+  year_built?: number | null
+  cadastral_zone?: string | null
+  plot_number?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  polygon_geojson?: string | null
+  title_type?: string | null
+  title_file_no?: string | null
+  title_holder_name?: string | null
+  title_issued_date?: string | null
+  title_issuing_authority?: string | null
+}
+
 export interface AdkListing {
   id: string
   title?: string
