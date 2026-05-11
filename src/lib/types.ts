@@ -323,3 +323,10 @@ export interface AdkAgent {
   tools_used?: string[]
   icon?: string
 }
+
+export interface RewriteResult {
+  description: string
+  summary: string
+  search_keywords: string[]
+  before: { description: string }
+}

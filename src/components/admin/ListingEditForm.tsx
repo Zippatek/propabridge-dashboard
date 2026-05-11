@@ -144,20 +144,20 @@ export function ListingEditForm({ listing, onSaved, onCancel }: ListingEditFormP
         title_holder_name: form.title_holder_name || undefined,
         title_issued_date: form.title_issued_date || undefined,
         title_issuing_authority: form.title_issuing_authority || undefined,
-        amenities: form.amenities
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean),
+        amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
         year_built: num(form.year_built as string),
       }
       for (const k of Object.keys(payload)) {
         if (payload[k] === undefined || payload[k] === null) delete payload[k]
       }
-      const updated = await be.send<AdminListing>(`/listings/${listing.id}`, 'PATCH', payload)
+      const res = await be.send<any>(`/listings/${listing.id}`, 'PATCH', payload)
+      const updatedData = res?.data || res?.item || res || {}
+
       onSaved({
         ...listing,
-        ...updated,
+        ...payload,
+        ...updatedData,
         images: images.map(i => i.url),
         cover_image_url: (images.find(i => i.is_cover) || images[0])?.url ?? null,
       })

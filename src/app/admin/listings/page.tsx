@@ -24,7 +24,7 @@ import { be } from '@/lib/client-api'
 import { normalizeListingType } from '@/lib/listing-type'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 import AddListingDrawer from '@/components/admin/AddListingDrawer'
-import { AdminListing } from '@/lib/types'
+import { AdminListing, RewriteResult } from '@/lib/types'
 import { ListingEditForm } from '@/components/admin/ListingEditForm'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -107,157 +107,6 @@ interface EditDrawerProps {
 }
 
 function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
-  const initialImages: ImageItem[] = (() => {
-    const arr = Array.isArray(listing.images) ? listing.images : []
-    if (arr.length === 0 && listing.cover_image_url) return [{ url: listing.cover_image_url, is_cover: true }]
-    return arr.map((url, i) => ({ url, is_cover: listing.cover_image_url ? url === listing.cover_image_url : i === 0 }))
-  })()
-
-  const [form, setForm] = useState({
-    title: listing.title || '',
-    description: listing.description || '',
-    city: listing.city || '',
-    neighborhood: listing.neighborhood || '',
-    address: listing.address || '',
-    price: listing.price ? String(listing.price) : '',
-    listing_type: normalizeListingType(listing.listing_type),
-    property_type: listing.property_type || 'apartment',
-    intent: listing.intent || '',
-    bedrooms: listing.bedrooms != null ? String(listing.bedrooms) : '',
-    bathrooms: listing.bathrooms != null ? String(listing.bathrooms) : '',
-    size_sqm: listing.size_sqm != null ? String(listing.size_sqm) : '',
-    built_up_area_sqm: listing.built_up_area_sqm != null ? String(listing.built_up_area_sqm) : '',
-    declared_plot_size_sqm: listing.declared_plot_size_sqm != null ? String(listing.declared_plot_size_sqm) : '',
-    slug: listing.slug || '',
-    featured: listing.featured || false,
-    verification_status: listing.verification_status || 'draft',
-    payment_plan: listing.payment_plan || '',
-    service_charge_ngn_per_year: listing.service_charge_ngn_per_year != null ? String(listing.service_charge_ngn_per_year) : '',
-    propabridge_commission_pct: listing.propabridge_commission_pct != null ? String(listing.propabridge_commission_pct) : '',
-    attribution_window_months: listing.attribution_window_months != null ? String(listing.attribution_window_months) : '',
-    selling_entity_type: listing.selling_entity_type || '',
-    selling_entity_legal_name: listing.selling_entity_legal_name || '',
-    cac_rc_number: listing.cac_rc_number || '',
-    power_supply: listing.power_supply || '',
-    water_supply: listing.water_supply || '',
-    sewage: listing.sewage || '',
-    road_access: listing.road_access || '',
-    construction_status: listing.construction_status || '',
-    condition: listing.condition || '',
-    is_estate_unit: !!listing.is_estate_unit,
-    estate_name: listing.estate_name || '',
-    amenities: Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
-    units_available: listing.units_available != null ? String(listing.units_available) : '',
-    year_built: listing.year_built != null ? String(listing.year_built) : '',
-    latitude: listing.latitude != null ? String(listing.latitude) : '',
-    longitude: listing.longitude != null ? String(listing.longitude) : '',
-    cadastral_zone: listing.cadastral_zone || '',
-    plot_number: listing.plot_number || '',
-    polygon_geojson: listing.polygon_geojson || '',
-    title_type: listing.title_type || '',
-    title_file_no: listing.title_file_no || '',
-    title_holder_name: listing.title_holder_name || '',
-    title_issued_date: listing.title_issued_date || '',
-    title_issuing_authority: listing.title_issuing_authority || '',
-  })
-  const [images, setImages] = useState<ImageItem[]>(initialImages)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const set = (k: string, v: unknown) => setForm(p => ({ ...p, [k]: v }))
-
-  const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
-
-  const handleSave = async () => {
-    setSaving(true)
-    setErr(null)
-    try {
-      const payload: Record<string, unknown> = {
-        title: form.title || undefined,
-        description: form.description || undefined,
-        city: form.city || undefined,
-        neighborhood: form.neighborhood || undefined,
-        address: form.address || undefined,
-        slug: form.slug || undefined,
-        listing_type: normalizeListingType(form.listing_type),
-        property_type: form.property_type,
-        intent: form.intent || undefined,
-        featured: form.featured,
-        verification_status: form.verification_status,
-        payment_plan: form.payment_plan || undefined,
-        selling_entity_type: form.selling_entity_type || undefined,
-        selling_entity_legal_name: form.selling_entity_legal_name || undefined,
-        cac_rc_number: form.cac_rc_number || undefined,
-        power_supply: form.power_supply || undefined,
-        water_supply: form.water_supply || undefined,
-        sewage: form.sewage || undefined,
-        road_access: form.road_access || undefined,
-        construction_status: form.construction_status || undefined,
-        condition: form.condition || undefined,
-        is_estate_unit: form.is_estate_unit,
-        estate_name: form.is_estate_unit ? (form.estate_name || undefined) : undefined,
-        price: num(form.price),
-        bedrooms: num(form.bedrooms),
-        bathrooms: num(form.bathrooms),
-        size_sqm: num(form.size_sqm),
-        built_up_area_sqm: num(form.built_up_area_sqm),
-        declared_plot_size_sqm: num(form.declared_plot_size_sqm),
-        service_charge_ngn_per_year: num(form.service_charge_ngn_per_year),
-        propabridge_commission_pct: num(form.propabridge_commission_pct),
-        attribution_window_months: num(form.attribution_window_months),
-        latitude: num(form.latitude),
-        longitude: num(form.longitude),
-        cadastral_zone: form.cadastral_zone || undefined,
-        plot_number: form.plot_number || undefined,
-        // polygon_geojson is a TEXT column — send the raw string as-is (not parsed)
-        polygon_geojson: (form.polygon_geojson as string)?.trim() || undefined,
-        title_type: form.title_type || undefined,
-        title_file_no: form.title_file_no || undefined,
-        title_holder_name: form.title_holder_name || undefined,
-        title_issued_date: form.title_issued_date || undefined,
-        title_issuing_authority: form.title_issuing_authority || undefined,
-        amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
-        units_available: num(form.units_available as string),
-        year_built: num(form.year_built as string),
-      }
-      // Strip keys with undefined/null values so the backend never sees them
-      for (const k of Object.keys(payload)) {
-        if (payload[k] === undefined || payload[k] === null) delete payload[k]
-      }
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
-      onSaved({
-        ...listing,
-        ...updated,
-        images: images.map(i => i.url),
-        cover_image_url: (images.find(i => i.is_cover) || images[0])?.url ?? null,
-      })
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const toggleDraft = async () => {
-    const nextStatus = form.verification_status === 'draft' ? 'submitted' : 'draft'
-    set('verification_status', nextStatus)
-    try {
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', { verification_status: nextStatus })
-      onSaved({ ...listing, ...updated, verification_status: nextStatus })
-    } catch (e) {
-      setErr((e as Error).message)
-      set('verification_status', form.verification_status)
-    }
-  }
-
-  const inputCls =
-    'w-full px-3 py-2.5 rounded-input border border-divider bg-white text-navy text-body-sm ' +
-    'focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent transition-all duration-150 placeholder-placeholder'
-
-  const selectCls =
-    'w-full px-3 py-2.5 rounded-input border border-divider bg-white text-navy text-body-sm ' +
-    'focus:outline-none focus:ring-2 focus:ring-action focus:border-transparent transition-all duration-150 appearance-none'
-
   return (
     <>
       <div
@@ -288,13 +137,6 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
 
 
 // ─── Rewrite Drawer (AI content rewrite) ─────────────────────────────────────
-
-interface RewriteResult {
-  description: string
-  summary: string
-  search_keywords: string[]
-  before: { description: string }
-}
 
 function RewriteDrawer({
   listing,
@@ -343,12 +185,13 @@ function RewriteDrawer({
         result.summary,
         result.search_keywords || [],
       )
-      const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
+      const res = await be.send<any>(`/listings/${listing.id}`, 'PATCH', payload)
       // Best-effort embedding refresh — never blocks upstream 404/501.
       // Proxy: /api/admin/be/<path> → api-gateway /<path> (same prefix as /listings).
       fetch(`/api/admin/be/properties/${listing.id}/embed`, {
-        method: 'POST', credentials: 'same-origin',
-      }).catch(() => { })
+        method: 'POST',
+        credentials: 'same-origin',
+      }).catch(() => {})
       const md = result.description.trim()
       const updatedData = res?.data || res?.item || res || {}
       onApplied({ ...listing, ...payload, ...updatedData, description: md })
