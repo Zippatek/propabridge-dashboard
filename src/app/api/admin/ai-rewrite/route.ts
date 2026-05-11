@@ -149,6 +149,7 @@ HARD CONSTRAINTS — NEVER VIOLATE:
 - Use ONLY facts present in the provided row. Never invent neighborhoods, prices, amenities, sizes, distances to landmarks, dates, or any other detail.
 - No AI-flavored phrasing ("nestled in", "boasts", "step into a world", "discover the pinnacle", "elevate your lifestyle", "unparalleled", "epitome of"). Plain, confident, human Nigerian-realtor tone.
 - If a fact is missing, simply omit it — do NOT speculate or hedge with "approximately".
+- Ensure the distinction between "Verified" and non-verified properties. Do not claim a property is verified unless explicitly stated in the row.
 
 OUTPUT FORMAT — respond with ONE JSON object only, no prose, no markdown fences:
 {

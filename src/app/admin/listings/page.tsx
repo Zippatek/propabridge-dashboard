@@ -74,6 +74,7 @@ interface Listing {
   amenities?: string[] | null
   images?: string[] | null
   units_available?: number | null
+  year_built?: number | null
 }
 
 const CONSTRUCTION_STATUS_OPTS = [
@@ -434,6 +435,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
     estate_name: listing.estate_name || '',
     amenities: Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
     units_available: listing.units_available != null ? String(listing.units_available) : '',
+    year_built: listing.year_built != null ? String(listing.year_built) : '',
   })
   const [images, setImages] = useState<ImageItem[]>(initialImages)
   const [saving, setSaving] = useState(false)
@@ -482,6 +484,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         attribution_window_months: num(form.attribution_window_months),
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
+        year_built: num(form.year_built as string),
       }
       const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
       onSaved({
@@ -648,15 +651,21 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
           </label>
 
           {/* Construction status */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Construction status</span>
-            <div className="relative">
-              <select className={selectCls} value={form.construction_status} onChange={e => set('construction_status', e.target.value)}>
-                {CONSTRUCTION_STATUS_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
-            </div>
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-caption text-subtle font-semibold mb-1.5 block">Construction status</span>
+              <div className="relative">
+                <select className={selectCls} value={form.construction_status} onChange={e => set('construction_status', e.target.value)}>
+                  {CONSTRUCTION_STATUS_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-caption text-subtle font-semibold mb-1.5 block">Year built</span>
+              <input className={inputCls} type="number" value={form.year_built} onChange={e => set('year_built', e.target.value)} placeholder="e.g. 2024" />
+            </label>
+          </div>
 
           {/* Pricing extras */}
           <div className="grid grid-cols-2 gap-3">
@@ -1037,6 +1046,7 @@ export default function AdminListingsPage() {
           built_up_area_sqm: item.built_up_area_sqm as number | null | undefined,
           declared_plot_size_sqm: item.declared_plot_size_sqm as number | null | undefined,
           units_available: item.units_available as number | null | undefined,
+          year_built: item.year_built as number | null | undefined,
           featured: item.featured as boolean | undefined,
           verification_status: (item.verification_status || (item.verified ? 'verified' : 'draft')) as string | undefined,
           agency_name: (item.agency_name || item.agent) as string | undefined,
