@@ -77,12 +77,12 @@ interface Listing {
 }
 
 const CONSTRUCTION_STATUS_OPTS = [
-  ['',                   '—'],
-  ['finished',           'Finished'],
-  ['semi_finished',      'Semi-finished'],
+  ['', '—'],
+  ['finished', 'Finished'],
+  ['semi_finished', 'Semi-finished'],
   ['under_construction', 'Under construction'],
-  ['off_plan',           'Off-plan'],
-  ['plots',              'Plots / land'],
+  ['off_plan', 'Off-plan'],
+  ['plots', 'Plots / land'],
 ] as const
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -139,12 +139,12 @@ function buildRewriteListingPatchBody(
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  verified:  'bg-verified-light text-verified border border-verified/20',
+  verified: 'bg-verified-light text-verified border border-verified/20',
   submitted: 'bg-gold/15 text-amber-700 border border-gold/30',
-  rejected:  'bg-danger-light text-danger border border-danger/20',
-  draft:     'bg-beige text-subtle border border-divider',
+  rejected: 'bg-danger-light text-danger border border-danger/20',
+  draft: 'bg-beige text-subtle border border-divider',
   in_review: 'bg-action-light text-action border border-action/20',
-  needs_info:'bg-orange-50 text-orange-700 border border-orange-200',
+  needs_info: 'bg-orange-50 text-orange-700 border border-orange-200',
 }
 
 function StatusPill({ status }: { status?: string }) {
@@ -164,7 +164,7 @@ interface EditDrawerProps {
   onSaved: (updated: Listing) => void
 }
 
-const PROPERTY_TYPES  = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
+const PROPERTY_TYPES = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
 const VERIFY_STATUSES = ['draft', 'submitted', 'in_review', 'needs_info', 'verified', 'rejected']
 
 // Multi-image manager — drag-to-reorder, mark cover, delete, upload more.
@@ -185,8 +185,8 @@ function ImageManager({
 }) {
   const [items, setItems] = useState<ImageItem[]>(initial)
   const [uploading, setUploading] = useState(false)
-  const [saving, setSaving]   = useState(false)
-  const [err, setErr]         = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const [enhanceStates, setEnhanceStates] = useState<EnhanceState[]>(() => initial.map(() => null))
   const dragIdx = useRef<number | null>(null)
 
@@ -211,7 +211,7 @@ function ImageManager({
   }
 
   const onDragStart = (i: number) => { dragIdx.current = i }
-  const onDragOver  = (e: React.DragEvent) => e.preventDefault()
+  const onDragOver = (e: React.DragEvent) => e.preventDefault()
   const onDrop = (i: number) => {
     const from = dragIdx.current
     dragIdx.current = null
@@ -299,81 +299,80 @@ function ImageManager({
           const isEnhancing = es === 'loading'
           const hasEnhanced = es !== null && es !== 'loading'
           return (
-          <div key={it.url + i} className="flex flex-col gap-1">
-            <div
-              draggable
-              onDragStart={() => onDragStart(i)}
-              onDragOver={onDragOver}
-              onDrop={() => onDrop(i)}
-              className="relative group rounded-input overflow-hidden border border-divider aspect-[4/3] cursor-move bg-beige"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={it.url} alt={`#${i + 1}`} className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={() => setCover(i)}
-                title={it.is_cover ? 'Cover image' : 'Mark as cover'}
-                className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-opacity ${
-                  it.is_cover ? 'bg-action text-white opacity-100' : 'bg-white/85 text-navy opacity-0 group-hover:opacity-100'
-                }`}
+            <div key={it.url + i} className="flex flex-col gap-1">
+              <div
+                draggable
+                onDragStart={() => onDragStart(i)}
+                onDragOver={onDragOver}
+                onDrop={() => onDrop(i)}
+                className="relative group rounded-input overflow-hidden border border-divider aspect-[4/3] cursor-move bg-beige"
               >
-                {it.is_cover ? 'Cover' : 'Set cover'}
-              </button>
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="absolute top-1 right-1 bg-navy/70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove"
-              >
-                <Trash2 size={11} />
-              </button>
-            </div>
-            {/* Enhance with AI */}
-            {!hasEnhanced ? (
-              <button
-                type="button"
-                onClick={() => enhanceImage(i)}
-                disabled={isEnhancing}
-                className="flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
-              >
-                {isEnhancing
-                  ? <><Loader2 size={9} className="animate-spin" /> Enhancing…</>
-                  : <><Wand2 size={9} /> Enhance</>}
-              </button>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {/* Before / After preview */}
-                <div className="grid grid-cols-2 gap-1">
-                  <div className="relative rounded overflow-hidden aspect-[4/3] border border-divider">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={it.url} alt="Before" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0 left-0 right-0 text-center bg-navy/60 text-white text-[9px] py-0.5">Before</span>
-                  </div>
-                  <div className="relative rounded overflow-hidden aspect-[4/3] border border-action">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={es} alt="Enhanced" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0 left-0 right-0 text-center bg-action/80 text-white text-[9px] py-0.5">Enhanced</span>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => acceptEnhancement(i)}
-                    className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-action text-white hover:bg-action-hover transition-colors"
-                  >
-                    <Check size={9} /> Use enhanced
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => discardEnhancement(i)}
-                    className="flex items-center justify-center px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-danger transition-colors"
-                  >
-                    <X size={9} />
-                  </button>
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={it.url} alt={`#${i + 1}`} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setCover(i)}
+                  title={it.is_cover ? 'Cover image' : 'Mark as cover'}
+                  className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-opacity ${it.is_cover ? 'bg-action text-white opacity-100' : 'bg-white/85 text-navy opacity-0 group-hover:opacity-100'
+                    }`}
+                >
+                  {it.is_cover ? 'Cover' : 'Set cover'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  className="absolute top-1 right-1 bg-navy/70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove"
+                >
+                  <Trash2 size={11} />
+                </button>
               </div>
-            )}
-          </div>
+              {/* Enhance with AI */}
+              {!hasEnhanced ? (
+                <button
+                  type="button"
+                  onClick={() => enhanceImage(i)}
+                  disabled={isEnhancing}
+                  className="flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
+                >
+                  {isEnhancing
+                    ? <><Loader2 size={9} className="animate-spin" /> Enhancing…</>
+                    : <><Wand2 size={9} /> Enhance</>}
+                </button>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {/* Before / After preview */}
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="relative rounded overflow-hidden aspect-[4/3] border border-divider">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={it.url} alt="Before" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0 left-0 right-0 text-center bg-navy/60 text-white text-[9px] py-0.5">Before</span>
+                    </div>
+                    <div className="relative rounded overflow-hidden aspect-[4/3] border border-action">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={es} alt="Enhanced" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0 left-0 right-0 text-center bg-action/80 text-white text-[9px] py-0.5">Enhanced</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => acceptEnhancement(i)}
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold bg-action text-white hover:bg-action-hover transition-colors"
+                    >
+                      <Check size={9} /> Use enhanced
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => discardEnhancement(i)}
+                      className="flex items-center justify-center px-1.5 py-1 rounded text-[10px] font-semibold bg-beige border border-divider text-subtle hover:text-danger transition-colors"
+                    >
+                      <X size={9} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )
         })}
         <label className={`flex flex-col items-center justify-center rounded-input border-2 border-dashed aspect-[4/3] cursor-pointer transition-colors ${uploading ? 'border-action bg-action-light/20 opacity-60' : 'border-divider hover:border-action hover:bg-beige/30'}`}>
@@ -401,44 +400,44 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
   })()
 
   const [form, setForm] = useState({
-    title:               listing.title || '',
-    description:         listing.description || '',
-    city:                listing.city  || '',
-    neighborhood:        listing.neighborhood || '',
-    address:             listing.address || '',
-    price:               listing.price ? String(listing.price) : '',
-    listing_type:        normalizeListingType(listing.listing_type),
-    property_type:       listing.property_type || 'apartment',
-    intent:              listing.intent || '',
-    bedrooms:            listing.bedrooms  != null ? String(listing.bedrooms)  : '',
-    bathrooms:           listing.bathrooms != null ? String(listing.bathrooms) : '',
-    size_sqm:            listing.size_sqm  != null ? String(listing.size_sqm)  : '',
-    built_up_area_sqm:   listing.built_up_area_sqm != null ? String(listing.built_up_area_sqm) : '',
+    title: listing.title || '',
+    description: listing.description || '',
+    city: listing.city || '',
+    neighborhood: listing.neighborhood || '',
+    address: listing.address || '',
+    price: listing.price ? String(listing.price) : '',
+    listing_type: normalizeListingType(listing.listing_type),
+    property_type: listing.property_type || 'apartment',
+    intent: listing.intent || '',
+    bedrooms: listing.bedrooms != null ? String(listing.bedrooms) : '',
+    bathrooms: listing.bathrooms != null ? String(listing.bathrooms) : '',
+    size_sqm: listing.size_sqm != null ? String(listing.size_sqm) : '',
+    built_up_area_sqm: listing.built_up_area_sqm != null ? String(listing.built_up_area_sqm) : '',
     declared_plot_size_sqm: listing.declared_plot_size_sqm != null ? String(listing.declared_plot_size_sqm) : '',
-    slug:                listing.slug || '',
-    featured:            listing.featured || false,
+    slug: listing.slug || '',
+    featured: listing.featured || false,
     verification_status: listing.verification_status || 'draft',
-    payment_plan:        listing.payment_plan || '',
+    payment_plan: listing.payment_plan || '',
     service_charge_ngn_per_year: listing.service_charge_ngn_per_year != null ? String(listing.service_charge_ngn_per_year) : '',
-    propabridge_commission_pct:  listing.propabridge_commission_pct  != null ? String(listing.propabridge_commission_pct)  : '',
-    attribution_window_months:   listing.attribution_window_months   != null ? String(listing.attribution_window_months)   : '',
-    selling_entity_type:        listing.selling_entity_type || '',
-    selling_entity_legal_name:  listing.selling_entity_legal_name || '',
-    cac_rc_number:              listing.cac_rc_number || '',
-    power_supply:        listing.power_supply || '',
-    water_supply:        listing.water_supply || '',
-    sewage:              listing.sewage || '',
-    road_access:         listing.road_access || '',
+    propabridge_commission_pct: listing.propabridge_commission_pct != null ? String(listing.propabridge_commission_pct) : '',
+    attribution_window_months: listing.attribution_window_months != null ? String(listing.attribution_window_months) : '',
+    selling_entity_type: listing.selling_entity_type || '',
+    selling_entity_legal_name: listing.selling_entity_legal_name || '',
+    cac_rc_number: listing.cac_rc_number || '',
+    power_supply: listing.power_supply || '',
+    water_supply: listing.water_supply || '',
+    sewage: listing.sewage || '',
+    road_access: listing.road_access || '',
     construction_status: listing.construction_status || '',
-    condition:           listing.condition || '',
-    is_estate_unit:      !!listing.is_estate_unit,
-    estate_name:         listing.estate_name || '',
-    amenities:           Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
-    units_available:     listing.units_available != null ? String(listing.units_available) : '',
+    condition: listing.condition || '',
+    is_estate_unit: !!listing.is_estate_unit,
+    estate_name: listing.estate_name || '',
+    amenities: Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
+    units_available: listing.units_available != null ? String(listing.units_available) : '',
   })
   const [images, setImages] = useState<ImageItem[]>(initialImages)
   const [saving, setSaving] = useState(false)
-  const [err, setErr]       = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
 
   const set = (k: string, v: unknown) => setForm(p => ({ ...p, [k]: v }))
 
@@ -449,38 +448,38 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
     setErr(null)
     try {
       const payload: Record<string, unknown> = {
-        title:        form.title        || undefined,
-        description:  form.description  || undefined,
-        city:         form.city         || undefined,
+        title: form.title || undefined,
+        description: form.description || undefined,
+        city: form.city || undefined,
         neighborhood: form.neighborhood || undefined,
-        address:      form.address      || undefined,
-        slug:         form.slug         || undefined,
-        listing_type:  normalizeListingType(form.listing_type),
+        address: form.address || undefined,
+        slug: form.slug || undefined,
+        listing_type: normalizeListingType(form.listing_type),
         property_type: form.property_type,
-        intent:       form.intent       || undefined,
-        featured:            form.featured,
+        intent: form.intent || undefined,
+        featured: form.featured,
         verification_status: form.verification_status,
-        payment_plan:        form.payment_plan || undefined,
-        selling_entity_type:        form.selling_entity_type        || undefined,
-        selling_entity_legal_name:  form.selling_entity_legal_name  || undefined,
-        cac_rc_number:              form.cac_rc_number              || undefined,
+        payment_plan: form.payment_plan || undefined,
+        selling_entity_type: form.selling_entity_type || undefined,
+        selling_entity_legal_name: form.selling_entity_legal_name || undefined,
+        cac_rc_number: form.cac_rc_number || undefined,
         power_supply: form.power_supply || undefined,
         water_supply: form.water_supply || undefined,
-        sewage:       form.sewage       || undefined,
-        road_access:  form.road_access  || undefined,
+        sewage: form.sewage || undefined,
+        road_access: form.road_access || undefined,
         construction_status: form.construction_status || undefined,
-        condition:           form.condition           || undefined,
+        condition: form.condition || undefined,
         is_estate_unit: form.is_estate_unit,
-        estate_name:    form.is_estate_unit ? (form.estate_name || undefined) : undefined,
-        price:    num(form.price),
-        bedrooms:  num(form.bedrooms),
+        estate_name: form.is_estate_unit ? (form.estate_name || undefined) : undefined,
+        price: num(form.price),
+        bedrooms: num(form.bedrooms),
         bathrooms: num(form.bathrooms),
-        size_sqm:  num(form.size_sqm),
-        built_up_area_sqm:           num(form.built_up_area_sqm),
-        declared_plot_size_sqm:      num(form.declared_plot_size_sqm),
+        size_sqm: num(form.size_sqm),
+        built_up_area_sqm: num(form.built_up_area_sqm),
+        declared_plot_size_sqm: num(form.declared_plot_size_sqm),
         service_charge_ngn_per_year: num(form.service_charge_ngn_per_year),
-        propabridge_commission_pct:  num(form.propabridge_commission_pct),
-        attribution_window_months:   num(form.attribution_window_months),
+        propabridge_commission_pct: num(form.propabridge_commission_pct),
+        attribution_window_months: num(form.attribution_window_months),
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
       }
@@ -751,11 +750,10 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
           {/* Draft / Publish toggle */}
           <button
             onClick={toggleDraft}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-button text-body-sm font-semibold transition-colors ${
-              form.verification_status === 'draft'
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-button text-body-sm font-semibold transition-colors ${form.verification_status === 'draft'
                 ? 'bg-action text-white hover:bg-action-hover'
                 : 'bg-beige text-navy hover:bg-divider/50 border border-divider'
-            }`}
+              }`}
           >
             {form.verification_status === 'draft'
               ? <><Send size={14} strokeWidth={2.2} /> Publish (move to submitted)</>
@@ -877,7 +875,7 @@ function RewriteDrawer({
       // Proxy: /api/admin/be/<path> → api-gateway /<path> (same prefix as /listings).
       fetch(`/api/admin/be/properties/${listing.id}/embed`, {
         method: 'POST', credentials: 'same-origin',
-      }).catch(() => {})
+      }).catch(() => { })
       const md = result.description.trim()
       onApplied({ ...listing, ...updated, description: md })
     } catch (e) {
@@ -971,14 +969,14 @@ function RewriteDrawer({
 const STATUS_FILTERS = ['all', 'verified', 'submitted', 'in_review', 'needs_info', 'draft', 'rejected']
 
 export default function AdminListingsPage() {
-  const [listings, setListings]     = useState<Listing[] | null>(null)
-  const [total, setTotal]           = useState(0)
-  const [error, setError]           = useState<string | null>(null)
-  const [search, setSearch]         = useState('')
-  const [statusFilter, setStatus]   = useState('all')
+  const [listings, setListings] = useState<Listing[] | null>(null)
+  const [total, setTotal] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatus] = useState('all')
   const [editTarget, setEditTarget] = useState<Listing | null>(null)
-  const [togglingId, setToggling]   = useState<string | null>(null)
-  const [showAdd, setShowAdd]       = useState(false)
+  const [togglingId, setToggling] = useState<string | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
   const [rewriteTarget, setRewriteTarget] = useState<Listing | null>(null)
   const [rewriteSavedToast, setRewriteSavedToast] = useState(false)
 
@@ -994,57 +992,57 @@ export default function AdminListingsPage() {
   const load = useCallback((q: string, status: string) => {
     setError(null)
     const params = new URLSearchParams({ limit: '50' })
-    if (q)                   params.set('q', q)
-    if (status !== 'all')    params.set('status', status)
+    if (q) params.set('q', q)
+    if (status !== 'all') params.set('status', status)
     be.get<Record<string, unknown>>(`/listings?${params}`)
       .then(d => {
         // Backend returns { success, count, data[] } — normalize to expected shape
         const raw = ((d.items || d.data || []) as Record<string, unknown>[])
         const items: Listing[] = raw.map(item => ({
-          id:                  String(item.id ?? ''),
-          title:               item.title               as string | undefined,
-          slug:                item.slug                as string | undefined,
-          city:                item.city                as string | undefined,
-          listing_type:        normalizeListingType(
+          id: String(item.id ?? ''),
+          title: item.title as string | undefined,
+          slug: item.slug as string | undefined,
+          city: item.city as string | undefined,
+          listing_type: normalizeListingType(
             (item.listing_type || item.transaction_type) as string | undefined,
           ),
-          property_type:       (item.property_type || item.type)            as string | undefined,
-          bedrooms:            item.bedrooms  as number | null | undefined,
-          bathrooms:           item.bathrooms as number | null | undefined,
-          size_sqm:            item.size_sqm  as number | null | undefined,
-          price:               item.price     as number | null | undefined,
-          previous_price:      item.previous_price as number | null | undefined,
-          cover_image_url:     (item.cover_image_url || (Array.isArray(item.images) ? item.images[0] : null)) as string | null | undefined,
-          images:              (Array.isArray(item.images) ? item.images : []) as string[],
-          amenities:           (Array.isArray(item.amenities) ? item.amenities : []) as string[],
+          property_type: (item.property_type || item.type) as string | undefined,
+          bedrooms: item.bedrooms as number | null | undefined,
+          bathrooms: item.bathrooms as number | null | undefined,
+          size_sqm: item.size_sqm as number | null | undefined,
+          price: item.price as number | null | undefined,
+          previous_price: item.previous_price as number | null | undefined,
+          cover_image_url: (item.cover_image_url || (Array.isArray(item.images) ? item.images[0] : null)) as string | null | undefined,
+          images: (Array.isArray(item.images) ? item.images : []) as string[],
+          amenities: (Array.isArray(item.amenities) ? item.amenities : []) as string[],
           construction_status: item.construction_status as string | null | undefined,
-          condition:           item.condition           as string | null | undefined,
-          intent:              item.intent              as string | null | undefined,
-          description:         listingDescriptionFromRow(item),
-          neighborhood:        item.neighborhood        as string | null | undefined,
-          address:             item.address             as string | null | undefined,
-          payment_plan:        item.payment_plan        as string | null | undefined,
+          condition: item.condition as string | null | undefined,
+          intent: item.intent as string | null | undefined,
+          description: listingDescriptionFromRow(item),
+          neighborhood: item.neighborhood as string | null | undefined,
+          address: item.address as string | null | undefined,
+          payment_plan: item.payment_plan as string | null | undefined,
           service_charge_ngn_per_year: item.service_charge_ngn_per_year as number | null | undefined,
-          propabridge_commission_pct:  item.propabridge_commission_pct  as number | null | undefined,
-          attribution_window_months:   item.attribution_window_months   as number | null | undefined,
-          selling_entity_type:        item.selling_entity_type        as string | null | undefined,
-          selling_entity_legal_name:  item.selling_entity_legal_name  as string | null | undefined,
-          cac_rc_number:              item.cac_rc_number              as string | null | undefined,
-          power_supply:        item.power_supply        as string | null | undefined,
-          water_supply:        item.water_supply        as string | null | undefined,
-          sewage:              item.sewage              as string | null | undefined,
-          road_access:         item.road_access         as string | null | undefined,
-          is_estate_unit:      item.is_estate_unit      as boolean | null | undefined,
-          estate_name:         item.estate_name         as string | null | undefined,
-          built_up_area_sqm:   item.built_up_area_sqm   as number | null | undefined,
+          propabridge_commission_pct: item.propabridge_commission_pct as number | null | undefined,
+          attribution_window_months: item.attribution_window_months as number | null | undefined,
+          selling_entity_type: item.selling_entity_type as string | null | undefined,
+          selling_entity_legal_name: item.selling_entity_legal_name as string | null | undefined,
+          cac_rc_number: item.cac_rc_number as string | null | undefined,
+          power_supply: item.power_supply as string | null | undefined,
+          water_supply: item.water_supply as string | null | undefined,
+          sewage: item.sewage as string | null | undefined,
+          road_access: item.road_access as string | null | undefined,
+          is_estate_unit: item.is_estate_unit as boolean | null | undefined,
+          estate_name: item.estate_name as string | null | undefined,
+          built_up_area_sqm: item.built_up_area_sqm as number | null | undefined,
           declared_plot_size_sqm: item.declared_plot_size_sqm as number | null | undefined,
-          units_available:      item.units_available as number | null | undefined,
-          featured:            item.featured as boolean | undefined,
+          units_available: item.units_available as number | null | undefined,
+          featured: item.featured as boolean | undefined,
           verification_status: (item.verification_status || (item.verified ? 'verified' : 'draft')) as string | undefined,
-          agency_name:         (item.agency_name || item.agent)  as string | undefined,
-          agency_id:           item.agency_id as string | undefined,
-          created_at:          item.created_at as string | undefined,
-          updated_at:          item.updated_at as string | undefined,
+          agency_name: (item.agency_name || item.agent) as string | undefined,
+          agency_id: item.agency_id as string | undefined,
+          created_at: item.created_at as string | undefined,
+          updated_at: item.updated_at as string | undefined,
         }))
         setListings(items)
         setTotal((d.total as number) || (d.count as number) || 0)
@@ -1121,7 +1119,7 @@ export default function AdminListingsPage() {
   // doesn't re-render on every dragover, then persist the new order on drop.
   const dragIndex = useRef<number | null>(null)
   const onRowDragStart = (i: number) => { dragIndex.current = i }
-  const onRowDragOver  = (e: React.DragEvent) => e.preventDefault()
+  const onRowDragOver = (e: React.DragEvent) => e.preventDefault()
   const onRowDrop = async (i: number) => {
     const from = dragIndex.current
     dragIndex.current = null
@@ -1198,100 +1196,6 @@ export default function AdminListingsPage() {
           </button>
         </div>
 
-        {/* Orphan bucket images (GCS agency-listings/…) */}
-        <div className="rounded-card border border-divider bg-white p-4 shadow-card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-body-sm font-semibold text-navy flex items-center gap-2">
-                <Upload size={16} className="text-subtle" aria-hidden />
-                Orphan bucket images
-              </h2>
-              <p className="text-caption text-subtle mt-0.5">
-                Objects under{' '}
-                <code className="text-[11px] bg-beige px-1 rounded">agency-listings/&lt;agency_id&gt;/…</code>{' '}
-                not referenced on any property row.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setBucketOrphansErr(null)
-                setBucketOrphansBusy(true)
-                be.get<{ orphans?: { url: string; path: string; agency_id?: string }[] }>(
-                  '/admin/orphan-bucket-images?max=500',
-                )
-                  .then((d) => setBucketOrphans(d.orphans ?? []))
-                  .catch((e) => setBucketOrphansErr((e as Error).message))
-                  .finally(() => setBucketOrphansBusy(false))
-              }}
-              disabled={bucketOrphansBusy}
-              className="flex items-center gap-2 px-3 py-2 rounded-button border border-divider text-caption font-semibold text-navy hover:bg-beige disabled:opacity-50"
-            >
-              {bucketOrphansBusy ? (
-                <Loader2 size={14} className="animate-spin" aria-hidden />
-              ) : (
-                <Upload size={14} aria-hidden />
-              )}
-              Scan bucket
-            </button>
-          </div>
-          {bucketOrphansErr && (
-            <p className="text-caption text-danger mt-2">{bucketOrphansErr}</p>
-          )}
-          {bucketOrphans !== null && bucketOrphans.length === 0 && !bucketOrphansBusy && (
-            <p className="text-caption text-subtle mt-3">No orphans found (within scan limit).</p>
-          )}
-          {bucketOrphans !== null && bucketOrphans.length > 0 && (
-            <ul className="mt-3 divide-y divide-divider max-h-72 overflow-y-auto">
-              {bucketOrphans.map((o) => (
-                <li key={o.path} className="py-3 flex flex-wrap items-center gap-3">
-                  <a
-                    href={o.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-caption text-action hover:underline truncate max-w-[200px]"
-                  >
-                    {o.path}
-                  </a>
-                  {o.agency_id != null && (
-                    <span className="text-caption text-subtle whitespace-nowrap">
-                      agency {o.agency_id}
-                    </span>
-                  )}
-                  <input
-                    type="text"
-                    placeholder="Property id (row id or PB-…)"
-                    value={attachPidByPath[o.path] ?? ''}
-                    onChange={(e) =>
-                      setAttachPidByPath((prev) => ({ ...prev, [o.path]: e.target.value }))
-                    }
-                    className="flex-1 min-w-[160px] px-2 py-1.5 rounded-input border border-divider text-caption"
-                  />
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 rounded-button bg-action text-white text-caption font-semibold hover:bg-action-hover"
-                    onClick={async () => {
-                      const pid = attachPidByPath[o.path]?.trim()
-                      if (!pid) return
-                      try {
-                        await be.send('/admin/orphan-bucket-images/attach', 'POST', {
-                          path: o.path,
-                          propertyId: pid,
-                        })
-                        setBucketOrphans((prev) => prev?.filter((x) => x.path !== o.path) ?? null)
-                      } catch (e) {
-                        alert((e as Error).message)
-                      }
-                    }}
-                  >
-                    Attach
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
         {/* Search + filter bar */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
@@ -1313,11 +1217,10 @@ export default function AdminListingsPage() {
               <button
                 key={s}
                 onClick={() => handleStatusFilter(s)}
-                className={`px-3 py-1.5 rounded-badge text-caption font-semibold capitalize transition-all duration-150 ${
-                  statusFilter === s
+                className={`px-3 py-1.5 rounded-badge text-caption font-semibold capitalize transition-all duration-150 ${statusFilter === s
                     ? 'bg-action text-white'
                     : 'bg-white border border-divider text-subtle hover:text-navy hover:bg-beige'
-                }`}
+                  }`}
               >
                 {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
               </button>
@@ -1432,15 +1335,14 @@ export default function AdminListingsPage() {
                           onClick={() => toggleFeatured(l)}
                           disabled={togglingId === l.id}
                           title={l.featured ? 'Remove from featured' : 'Mark as featured'}
-                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-button text-caption font-semibold transition-all duration-150 disabled:opacity-50 ${
-                            l.featured
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-button text-caption font-semibold transition-all duration-150 disabled:opacity-50 ${l.featured
                               ? 'bg-gold/20 text-amber-700 hover:bg-gold/30'
                               : 'bg-beige text-subtle hover:bg-beige/70 hover:text-navy'
-                          }`}
+                            }`}
                         >
                           {l.featured
                             ? <StarOff size={12} strokeWidth={2} />
-                            : <Star    size={12} strokeWidth={2} />}
+                            : <Star size={12} strokeWidth={2} />}
                           <span className="hidden sm:inline">{l.featured ? 'Unfeature' : 'Feature'}</span>
                         </button>
 
