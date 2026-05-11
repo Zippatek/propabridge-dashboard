@@ -132,6 +132,22 @@ export default function AdminAuditPage() {
   const [billingBanner, setBillingBanner] = useState<string | null>(null)
   const [autofixContextModal, setAutofixContextModal] = useState('')
   const [flaggedTotal, setFlaggedTotal] = useState<number | null>(null)
+  const [expandedPid, setExpandedPid] = useState<string | null>(null)
+  /** Optional operator notes passed to Gemini autofix (per property id) */
+  const [fixContextByProperty, setFixContextByProperty] = useState<Record<string, string>>({})
+  const [listingEdit, setListingEdit] = useState<
+    Record<
+      string,
+      {
+        price: string
+        listing_type: string
+        size_sqm: string
+        intent: string
+        loaded: boolean
+        saving: boolean
+      }
+    >
+  >({})
 
   const load = useCallback(async (sev: string) => {
     setError(null)
@@ -158,6 +174,121 @@ export default function AdminAuditPage() {
     return `${auditRowId}:${index}`
   }
 
+  const normalizeListingTypeUi = (raw: string | null | undefined): string => {
+    const s = String(raw || '').toLowerCase()
+    if (s.includes('rent')) return 'rent'
+    return 'sale'
+  }
+
+  const ensureListingEdit = async (pid: string) => {
+    if (listingEdit[pid]?.loaded) return
+    setListingEdit(prev => ({
+      ...prev,
+      [pid]: {
+        price: '',
+        listing_type: 'sale',
+        size_sqm: '',
+        intent: '',
+        loaded: false,
+        saving: false,
+      },
+    }))
+    try {
+      const json = await be.get<{
+        success?: boolean
+        data?: {
+          price?: number | null
+          listing_type?: string | null
+          size_sqm?: number | string | null
+          intent?: string | null
+        }
+      }>(`/listings/${encodeURIComponent(pid)}`)
+      const row =
+        json.data ??
+        (json as unknown as {
+          price?: number | null
+          listing_type?: string | null
+          size_sqm?: number | string | null
+          intent?: string | null
+        })
+      const r = row as {
+        price?: number | null
+        listing_type?: string | null
+        size_sqm?: number | string | null
+        intent?: string | null
+      }
+      setListingEdit(prev => ({
+        ...prev,
+        [pid]: {
+          price: r.price != null ? String(r.price) : '',
+          listing_type: normalizeListingTypeUi(r.listing_type),
+          size_sqm: r.size_sqm != null ? String(r.size_sqm) : '',
+          intent: r.intent != null ? String(r.intent) : '',
+          loaded: true,
+          saving: false,
+        },
+      }))
+    } catch {
+      setListingEdit(prev => ({
+        ...prev,
+        [pid]: {
+          price: '',
+          listing_type: 'sale',
+          size_sqm: '',
+          intent: '',
+          loaded: true,
+          saving: false,
+        },
+      }))
+    }
+  }
+
+  const toggleExpand = (pid: string) => {
+    if (expandedPid === pid) {
+      setExpandedPid(null)
+      return
+    }
+    setExpandedPid(pid)
+    void ensureListingEdit(pid)
+  }
+
+  const saveListingPatch = async (pid: string) => {
+    const ed = listingEdit[pid]
+    if (!ed) return
+    setListingEdit(prev => ({ ...prev, [pid]: { ...ed, saving: true } }))
+    setNotice(null)
+    setError(null)
+    try {
+      const payload: Record<string, unknown> = {}
+      if (ed.price.trim()) {
+        const n = Number(ed.price)
+        if (!Number.isFinite(n)) throw new Error('Price must be a number')
+        payload.price = n
+      }
+      if (ed.listing_type) payload.listing_type = ed.listing_type
+      if (ed.size_sqm.trim()) {
+        const n = Number(ed.size_sqm)
+        if (!Number.isFinite(n)) throw new Error('Size must be a number')
+        payload.size_sqm = n
+      }
+      if (ed.intent.trim()) payload.intent = ed.intent.trim()
+      if (Object.keys(payload).length === 0) {
+        setNotice('No field changes to save.')
+        return
+      }
+      await be.send(`/listings/${encodeURIComponent(pid)}`, 'PATCH', payload)
+      setNotice('Listing saved. Audit list refreshed.')
+      await load(severityFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setListingEdit(prev => {
+        const cur = prev[pid]
+        if (!cur) return prev
+        return { ...prev, [pid]: { ...cur, saving: false } }
+      })
+    }
+  }
 
   const dryRunAutofix = async (
     propertyId: string,
@@ -340,6 +471,19 @@ export default function AdminAuditPage() {
             <div key={r.id} className="bg-white rounded-card border border-divider shadow-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                 <div className="min-w-0 flex items-start gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(r.property_id)}
+                    className="mt-0.5 p-0.5 text-subtle hover:text-navy rounded"
+                    aria-expanded={expandedPid === r.property_id}
+                    title={expandedPid === r.property_id ? 'Collapse' : 'Expand listing edits'}
+                  >
+                    {expandedPid === r.property_id ? (
+                      <ChevronDown size={18} strokeWidth={2} />
+                    ) : (
+                      <ChevronRight size={18} strokeWidth={2} />
+                    )}
+                  </button>
                   <div>
                   <p className="text-body-sm font-semibold text-navy line-clamp-1">
                     {r.property_title || '(deleted property)'}
@@ -370,10 +514,10 @@ export default function AdminAuditPage() {
                     Auto-fix all (in scope)
                   </button>
                   <Link
-                    href={`/admin/listings/${r.property_id}/edit`}
+                    href={`/admin/listings?focus=${r.property_id}`}
                     className="flex items-center gap-1 text-caption text-action hover:underline"
                   >
-                    Edit <ExternalLink size={11} />
+                    Open <ExternalLink size={11} />
                   </Link>
                 </div>
               </div>
@@ -382,6 +526,143 @@ export default function AdminAuditPage() {
                   <span className="font-semibold text-navy">Pricing model hint:</span> {r.pricing_hint}
                 </p>
               ) : null}
+              {expandedPid === r.property_id && (
+                <div className="mb-4 pl-7 space-y-3 pt-1 border-t border-divider/80">
+                  <div>
+                    <label className="text-caption font-semibold text-subtle uppercase tracking-wide">Fix context (optional)</label>
+                    <p className="text-[11px] text-placeholder mb-1">
+                      Passed to AI auto-fix as operator constraints only; does not override database facts.
+                    </p>
+                    <textarea
+                      value={fixContextByProperty[r.property_id] ?? ''}
+                      onChange={e =>
+                        setFixContextByProperty(prev => ({
+                          ...prev,
+                          [r.property_id]: e.target.value,
+                        }))
+                      }
+                      rows={3}
+                      className="w-full mt-1 px-3 py-2 rounded-input border border-divider text-body-sm text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
+                      placeholder="e.g. Price is annual rent; title uses per-sqm developer rate…"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Price</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={listingEdit[r.property_id]?.price ?? ''}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              price: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm"
+                      />
+                    </label>
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Listing type</span>
+                      <select
+                        value={listingEdit[r.property_id]?.listing_type ?? 'sale'}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              listing_type: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm bg-white"
+                      >
+                        <option value="sale">Sale</option>
+                        <option value="rent">Rent</option>
+                      </select>
+                    </label>
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Size (m²)</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={listingEdit[r.property_id]?.size_sqm ?? ''}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              size_sqm: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm"
+                      />
+                    </label>
+                    <label className="text-body-sm">
+                      <span className="text-caption text-subtle block mb-0.5">Intent</span>
+                      <input
+                        type="text"
+                        value={listingEdit[r.property_id]?.intent ?? ''}
+                        onChange={e =>
+                          setListingEdit(prev => ({
+                            ...prev,
+                            [r.property_id]: {
+                              ...(prev[r.property_id] || {
+                                price: '',
+                                listing_type: 'sale',
+                                size_sqm: '',
+                                intent: '',
+                                loaded: true,
+                                saving: false,
+                              }),
+                              intent: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-input border border-divider text-body-sm"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled={listingEdit[r.property_id]?.saving}
+                      onClick={() => saveListingPatch(r.property_id)}
+                      className="px-4 py-2 rounded-button bg-navy text-white text-body-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                    >
+                      {listingEdit[r.property_id]?.saving ? (
+                        <Loader2 size={14} className="animate-spin inline" />
+                      ) : null}{' '}
+                      Save listing fields
+                    </button>
+                  </div>
+                </div>
+              )}
               <ul className="space-y-1.5">
                 {r.issues.map((issue, idx) => {
                   const Icon = SEV_ICON[issue.severity] || Info
