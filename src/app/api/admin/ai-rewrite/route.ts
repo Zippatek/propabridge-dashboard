@@ -23,7 +23,7 @@ function getGeminiApiKey(): string {
 }
 
 function geminiAiRewriteModel(): string {
-  return String(process.env.GEMINI_AI_REWRITE_MODEL || '').trim() || 'gemini-3.1-flash-lite-preview'
+  return String(process.env.GEMINI_AI_REWRITE_MODEL || '').trim() || 'gemini-1.5-flash-latest'
 }
 
 /**

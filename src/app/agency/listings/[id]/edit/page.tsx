@@ -106,6 +106,10 @@ export default function EditListingPage() {
     setSaved(false)
     setError(null)
     try {
+      const amenities = form.amenities.trim()
+          ? form.amenities.split(',').map((s) => s.trim()).filter(Boolean)
+          : undefined;
+
       const body: Record<string, unknown> = {
         title: form.title || undefined,
         price: form.price ? Number(form.price) : undefined,
@@ -115,10 +119,11 @@ export default function EditListingPage() {
         bedrooms: form.bedrooms ? Number(form.bedrooms) : undefined,
         bathrooms: form.bathrooms ? Number(form.bathrooms) : undefined,
         images: form.images.length > 0 ? form.images : undefined,
-        amenities: form.amenities.trim()
-          ? form.amenities.split(',').map((s) => s.trim()).filter(Boolean)
-          : undefined,
+        amenities: amenities,
       }
+      // Remove undefined keys
+      Object.keys(body).forEach(key => body[key] === undefined && delete body[key])
+
       const resp = await agency.send<{
         listing: Listing
         verification_reset?: boolean

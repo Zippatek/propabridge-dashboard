@@ -78,18 +78,16 @@ async function runParse(text: string) {
       - location (string)
       - bedrooms (number)
       - bathrooms (number)
+      - description (string)
       - size (string, e.g., "400 SQM")
       - amenities (array of strings)
-
       If a value is not found, omit the key. The price should be a number, without currency symbols or commas.
-
       Text to parse: "${text}"
-
       JSON response:
     `;
 
     const result = await geminiGenerateContent({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-1.5-flash-latest',
         userText: prompt,
         maxOutputTokens: 2048,
     });
@@ -98,7 +96,9 @@ async function runParse(text: string) {
         throw new Error('Failed to parse text with Gemini.');
     }
     
-    return JSON.parse(result.text);
+    // Strip markdown fences
+    const cleanedText = result.text.replace(/```json\n|```/g, '');
+    return JSON.parse(cleanedText);
 }
 
 
