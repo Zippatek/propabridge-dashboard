@@ -75,6 +75,16 @@ interface Listing {
   images?: string[] | null
   units_available?: number | null
   year_built?: number | null
+  cadastral_zone?: string | null
+  plot_number?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  polygon_geojson?: string | null
+  title_type?: string | null
+  title_file_no?: string | null
+  title_holder_name?: string | null
+  title_issued_date?: string | null
+  title_issuing_authority?: string | null
 }
 
 const CONSTRUCTION_STATUS_OPTS = [
@@ -436,6 +446,16 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
     amenities: Array.isArray(listing.amenities) ? listing.amenities.join(', ') : '',
     units_available: listing.units_available != null ? String(listing.units_available) : '',
     year_built: listing.year_built != null ? String(listing.year_built) : '',
+    latitude: listing.latitude != null ? String(listing.latitude) : '',
+    longitude: listing.longitude != null ? String(listing.longitude) : '',
+    cadastral_zone: listing.cadastral_zone || '',
+    plot_number: listing.plot_number || '',
+    polygon_geojson: listing.polygon_geojson || '',
+    title_type: listing.title_type || '',
+    title_file_no: listing.title_file_no || '',
+    title_holder_name: listing.title_holder_name || '',
+    title_issued_date: listing.title_issued_date || '',
+    title_issuing_authority: listing.title_issuing_authority || '',
   })
   const [images, setImages] = useState<ImageItem[]>(initialImages)
   const [saving, setSaving] = useState(false)
@@ -482,6 +502,16 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         service_charge_ngn_per_year: num(form.service_charge_ngn_per_year),
         propabridge_commission_pct: num(form.propabridge_commission_pct),
         attribution_window_months: num(form.attribution_window_months),
+        latitude: num(form.latitude),
+        longitude: num(form.longitude),
+        cadastral_zone: form.cadastral_zone || undefined,
+        plot_number: form.plot_number || undefined,
+        polygon_geojson: form.polygon_geojson || undefined,
+        title_type: form.title_type || undefined,
+        title_file_no: form.title_file_no || undefined,
+        title_holder_name: form.title_holder_name || undefined,
+        title_issued_date: form.title_issued_date || undefined,
+        title_issuing_authority: form.title_issuing_authority || undefined,
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
         year_built: num(form.year_built as string),
@@ -581,6 +611,43 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
             </label>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-caption text-subtle font-semibold mb-1.5 block">Latitude</span>
+              <input className={inputCls} value={form.latitude} onChange={e => set('latitude', e.target.value)} placeholder="e.g. 9.0765" />
+            </label>
+            <label className="block">
+              <span className="text-caption text-subtle font-semibold mb-1.5 block">Longitude</span>
+              <input className={inputCls} value={form.longitude} onChange={e => set('longitude', e.target.value)} placeholder="e.g. 7.3986" />
+            </label>
+          </div>
+
+          <details className="group">
+            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Advanced location</summary>
+            <div className="pt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Cadastral Zone</span>
+                  <input className={inputCls} value={form.cadastral_zone} onChange={e => set('cadastral_zone', e.target.value)} placeholder="e.g. B09" />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Plot Number</span>
+                  <input className={inputCls} value={form.plot_number} onChange={e => set('plot_number', e.target.value)} placeholder="e.g. 1234" />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-caption text-subtle font-semibold mb-1.5 block">Polygon GeoJSON</span>
+                <textarea
+                  className={`${inputCls} font-mono resize-none`}
+                  rows={3}
+                  value={form.polygon_geojson}
+                  onChange={e => set('polygon_geojson', e.target.value)}
+                  placeholder='{"type":"Polygon","coordinates":[[...]]}'
+                />
+              </label>
+            </div>
+          </details>
+
           {/* Price */}
           <label className="block">
             <span className="text-caption text-subtle font-semibold mb-1.5 block">Price (₦)</span>
@@ -596,6 +663,45 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
               <p className="text-[11px] text-action mt-1">{formatPrice(Number(form.price))}</p>
             )}
           </label>
+
+          <details className="group">
+            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Title & Legal</summary>
+            <div className="pt-3 space-y-3">
+              <label className="block">
+                <span className="text-caption text-subtle font-semibold mb-1.5 block">Title Type</span>
+                <div className="relative">
+                  <select className={selectCls} value={form.title_type} onChange={e => set('title_type', e.target.value)}>
+                    <option value="">— Select —</option>
+                    <option value="c_of_o">Certificate of Occupancy (C of O)</option>
+                    <option value="r_of_o">Right of Occupancy (R of O)</option>
+                    <option value="governors_consent">Governor's Consent</option>
+                    <option value="deed_of_assignment">Deed of Assignment</option>
+                    <option value="customary">Customary</option>
+                    <option value="allocation_letter">Allocation Letter</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
+                </div>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Title File No.</span>
+                  <input className={inputCls} value={form.title_file_no} onChange={e => set('title_file_no', e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Title Issued Date</span>
+                  <input className={inputCls} type="date" value={form.title_issued_date} onChange={e => set('title_issued_date', e.target.value)} />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-caption text-subtle font-semibold mb-1.5 block">Title Holder Name</span>
+                <input className={inputCls} value={form.title_holder_name} onChange={e => set('title_holder_name', e.target.value)} />
+              </label>
+              <label className="block">
+                <span className="text-caption text-subtle font-semibold mb-1.5 block">Issuing Authority</span>
+                <input className={inputCls} value={form.title_issuing_authority} onChange={e => set('title_issuing_authority', e.target.value)} />
+              </label>
+            </div>
+          </details>
 
           {/* Listing Type + Property Type */}
           <div className="grid grid-cols-2 gap-3">
@@ -667,69 +773,85 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
             </label>
           </div>
 
-          {/* Pricing extras */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Payment plan</span>
-              <input className={inputCls} value={form.payment_plan} onChange={e => set('payment_plan', e.target.value)} placeholder="outright / installment…" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Service charge (₦/yr)</span>
-              <input className={inputCls} type="number" value={form.service_charge_ngn_per_year} onChange={e => set('service_charge_ngn_per_year', e.target.value)} placeholder="0" />
-            </label>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Commission (%)</span>
-              <input className={inputCls} type="number" value={form.propabridge_commission_pct} onChange={e => set('propabridge_commission_pct', e.target.value)} placeholder="5" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Attribution (months)</span>
-              <input className={inputCls} type="number" value={form.attribution_window_months} onChange={e => set('attribution_window_months', e.target.value)} placeholder="12" />
-            </label>
-          </div>
+          <details className="group">
+            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Pricing & Terms</summary>
+            <div className="pt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Payment plan</span>
+                  <input className={inputCls} value={form.payment_plan} onChange={e => set('payment_plan', e.target.value)} placeholder="outright / installment…" />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Service charge (₦/yr)</span>
+                  <input className={inputCls} type="number" value={form.service_charge_ngn_per_year} onChange={e => set('service_charge_ngn_per_year', e.target.value)} placeholder="0" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Commission (%)</span>
+                  <input className={inputCls} type="number" value={form.propabridge_commission_pct} onChange={e => set('propabridge_commission_pct', e.target.value)} placeholder="5" />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Attribution (months)</span>
+                  <input className={inputCls} type="number" value={form.attribution_window_months} onChange={e => set('attribution_window_months', e.target.value)} placeholder="12" />
+                </label>
+              </div>
+            </div>
+          </details>
 
-          {/* Seller */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Selling entity type</span>
-              <input className={inputCls} value={form.selling_entity_type} onChange={e => set('selling_entity_type', e.target.value)} placeholder="developer / agent…" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">CAC RC #</span>
-              <input className={inputCls} value={form.cac_rc_number} onChange={e => set('cac_rc_number', e.target.value)} />
-            </label>
-          </div>
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Selling entity legal name</span>
-            <input className={inputCls} value={form.selling_entity_legal_name} onChange={e => set('selling_entity_legal_name', e.target.value)} />
-          </label>
+          <details className="group">
+            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Seller</summary>
+            <div className="pt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Selling entity type</span>
+                  <input className={inputCls} value={form.selling_entity_type} onChange={e => set('selling_entity_type', e.target.value)} placeholder="developer / agent…" />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">CAC RC #</span>
+                  <input className={inputCls} value={form.cac_rc_number} onChange={e => set('cac_rc_number', e.target.value)} />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-caption text-subtle font-semibold mb-1.5 block">Selling entity legal name</span>
+                <input className={inputCls} value={form.selling_entity_legal_name} onChange={e => set('selling_entity_legal_name', e.target.value)} />
+              </label>
+            </div>
+          </details>
 
-          {/* Utilities */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Power</span>
-              <input className={inputCls} value={form.power_supply} onChange={e => set('power_supply', e.target.value)} placeholder="grid / solar…" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Water</span>
-              <input className={inputCls} value={form.water_supply} onChange={e => set('water_supply', e.target.value)} placeholder="mains / borehole…" />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Sewage</span>
-              <input className={inputCls} value={form.sewage} onChange={e => set('sewage', e.target.value)} />
-            </label>
-            <label className="block">
-              <span className="text-caption text-subtle font-semibold mb-1.5 block">Road access</span>
-              <input className={inputCls} value={form.road_access} onChange={e => set('road_access', e.target.value)} />
-            </label>
-          </div>
+          <details className="group">
+            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Utilities & Condition</summary>
+            <div className="pt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Power</span>
+                  <input className={inputCls} value={form.power_supply} onChange={e => set('power_supply', e.target.value)} placeholder="grid / solar…" />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Water</span>
+                  <input className={inputCls} value={form.water_supply} onChange={e => set('water_supply', e.target.value)} placeholder="mains / borehole…" />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Sewage</span>
+                  <input className={inputCls} value={form.sewage} onChange={e => set('sewage', e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-caption text-subtle font-semibold mb-1.5 block">Road access</span>
+                  <input className={inputCls} value={form.road_access} onChange={e => set('road_access', e.target.value)} />
+                </label>
+              </div>
+            </div>
+          </details>
 
-          {/* Amenities */}
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Amenities (comma-separated)</span>
-            <input className={inputCls} value={form.amenities} onChange={e => set('amenities', e.target.value)} placeholder="Pool, Gym, 24hr Security" />
-          </label>
+          <details className="group">
+            <summary className="text-caption text-subtle cursor-pointer hover:text-navy">Amenities & Narrative</summary>
+            <div className="pt-3 space-y-3">
+              <label className="block">
+                <span className="text-caption text-subtle font-semibold mb-1.5 block">Amenities (comma-separated)</span>
+                <input className={inputCls} value={form.amenities} onChange={e => set('amenities', e.target.value)} placeholder="Pool, Gym, 24hr Security" />
+              </label>
+            </div>
+          </details>
 
           {/* Units available */}
           <label className="block">
@@ -1047,6 +1169,16 @@ export default function AdminListingsPage() {
           declared_plot_size_sqm: item.declared_plot_size_sqm as number | null | undefined,
           units_available: item.units_available as number | null | undefined,
           year_built: item.year_built as number | null | undefined,
+          latitude: item.latitude as number | null | undefined,
+          longitude: item.longitude as number | null | undefined,
+          cadastral_zone: item.cadastral_zone as string | null | undefined,
+          plot_number: item.plot_number as string | null | undefined,
+          polygon_geojson: item.polygon_geojson as string | null | undefined,
+          title_type: item.title_type as string | null | undefined,
+          title_file_no: item.title_file_no as string | null | undefined,
+          title_holder_name: item.title_holder_name as string | null | undefined,
+          title_issued_date: item.title_issued_date as string | null | undefined,
+          title_issuing_authority: item.title_issuing_authority as string | null | undefined,
           featured: item.featured as boolean | undefined,
           verification_status: (item.verification_status || (item.verified ? 'verified' : 'draft')) as string | undefined,
           agency_name: (item.agency_name || item.agent) as string | undefined,
