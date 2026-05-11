@@ -171,6 +171,9 @@ export default function PropertyDetailPage({
                 >
                   {property.id} {copied ? <CheckCircle size={14} className="text-green-600"/> : <Copy size={14} />}
                 </button>
+                <Link href={`/dashboard/listings/${property.id}/edit`}>
+                  <Button variant="primary" size="sm">Edit</Button>
+                </Link>
              </div>
           </div>
         </div>
