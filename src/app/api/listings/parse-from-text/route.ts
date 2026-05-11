@@ -1,10 +1,13 @@
-// app/api/listings/parse-from-text/route.ts
 import { NextResponse } from 'next/server';
 
-const GEMINI_REST_BASE = 'https://generativelanguage.googleapis.com/v1/models';
+const GEMINI_REST_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function getGeminiApiKey(): string {
   return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+}
+
+function getGeminiModel(): string {
+  return String(process.env.GEMINI_MODEL || '').trim() || 'gemini-2.0-flash-lite';
 }
 
 function geminiResponseText(respJson: {
@@ -70,51 +73,59 @@ async function geminiGenerateContent({
 }
 
 async function runParse(text: string) {
-    const prompt = `
-      You are an expert real estate data extractor. Parse the following property description
-      and return a structured JSON object with the following fields:
-      - title (string)
-      - price (number)
-      - location (string)
-      - bedrooms (number)
-      - bathrooms (number)
-      - description (string)
-      - size (string, e.g., "400 SQM")
-      - amenities (array of strings)
-      If a value is not found, omit the key. The price should be a number, without currency symbols or commas.
-      Text to parse: "${text}"
-      JSON response:
-    `;
+  const prompt = `You are an expert real estate data extractor.
 
-    const result = await geminiGenerateContent({
-        model: 'gemini-1.5-flash-latest',
-        userText: prompt,
-        maxOutputTokens: 2048,
-    });
+The input below may be in ANY format: a spreadsheet row, tab-separated or pipe-separated data,
+CSV, plain prose, a WhatsApp message, agent notes, a JSON blob, or any other mix of structured
+and unstructured text. Your job is to understand whatever format is given and extract property
+listing fields from it.
 
-    if (!result.ok) {
-        throw new Error('Failed to parse text with Gemini.');
-    }
-    
-    // Strip markdown fences
-    const cleanedText = result.text.replace(/```json\n|```/g, '');
-    return JSON.parse(cleanedText);
+Extract the following fields wherever present:
+- title (string): a descriptive property title
+- price (number): listing price in Naira, as a plain number without currency symbols or commas
+- location (string): city, area, or address
+- bedrooms (number)
+- bathrooms (number)
+- description (string): a brief property description
+- size (string): floor area or plot size, e.g. "400 SQM" or "3 plots"
+- amenities (array of strings): list of features/amenities
+- property_type (string): e.g. Apartment, Detached House, Land, Duplex, etc.
+- listing_type (string): "sale" or "rent"
+- year_built (number): year the property was built, if mentioned
+
+If a value cannot be found in the input, omit that key entirely.
+Return ONLY a valid JSON object with these fields — no explanation, no markdown.
+
+Input:
+${text}`;
+
+  const result = await geminiGenerateContent({
+    model: getGeminiModel(),
+    userText: prompt,
+    maxOutputTokens: 2048,
+  });
+
+  if (!result.ok) {
+    throw new Error(`Gemini returned an error (HTTP ${result.status}). Try again shortly.`);
+  }
+
+  // Strip any markdown fences Gemini might wrap around the JSON
+  const cleaned = result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  return JSON.parse(cleaned);
 }
-
-
 
 export async function POST(request: Request) {
   try {
     const { text } = await request.json();
-    if (!text) {
+    if (!text || typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    const parsedData = await runParse(text);
+    const parsedData = await runParse(text.trim());
     return NextResponse.json(parsedData);
-
   } catch (error) {
     console.error('Error parsing property data:', error);
-    return NextResponse.json({ error: 'Failed to parse property data' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Failed to parse property data';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

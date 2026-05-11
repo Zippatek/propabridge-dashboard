@@ -506,7 +506,11 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         longitude: num(form.longitude),
         cadastral_zone: form.cadastral_zone || undefined,
         plot_number: form.plot_number || undefined,
-        polygon_geojson: form.polygon_geojson || undefined,
+        polygon_geojson: (() => {
+          const v = form.polygon_geojson?.trim()
+          if (!v) return undefined
+          try { return JSON.parse(v) } catch { return undefined }
+        })(),
         title_type: form.title_type || undefined,
         title_file_no: form.title_file_no || undefined,
         title_holder_name: form.title_holder_name || undefined,
@@ -515,6 +519,10 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
         year_built: num(form.year_built as string),
+      }
+      // Strip keys with undefined/null values so the backend never sees them
+      for (const k of Object.keys(payload)) {
+        if (payload[k] === undefined || payload[k] === null) delete payload[k]
       }
       const updated = await be.send<Listing>(`/listings/${listing.id}`, 'PATCH', payload)
       onSaved({
