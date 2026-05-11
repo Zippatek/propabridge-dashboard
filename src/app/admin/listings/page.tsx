@@ -506,11 +506,8 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         longitude: num(form.longitude),
         cadastral_zone: form.cadastral_zone || undefined,
         plot_number: form.plot_number || undefined,
-        polygon_geojson: (() => {
-          const v = form.polygon_geojson?.trim()
-          if (!v) return undefined
-          try { return JSON.parse(v) } catch { return undefined }
-        })(),
+        // polygon_geojson is a TEXT column — send the raw string as-is (not parsed)
+        polygon_geojson: (form.polygon_geojson as string)?.trim() || undefined,
         title_type: form.title_type || undefined,
         title_file_no: form.title_file_no || undefined,
         title_holder_name: form.title_holder_name || undefined,
