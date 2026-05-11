@@ -16,14 +16,14 @@ import { beFetch, ApiError } from '@/lib/api'
  * the listing itself via /api/admin/be/listings/:id when the admin accepts.
  */
 
-const GEMINI_REST_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+const GEMINI_REST_BASE = 'https://generativelanguage.googleapis.com/v1/models'
 
 function getGeminiApiKey(): string {
   return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim()
 }
 
 function geminiAiRewriteModel(): string {
-  return String(process.env.GEMINI_AI_REWRITE_MODEL || '').trim() || 'gemini-2.5-flash'
+  return String(process.env.GEMINI_AI_REWRITE_MODEL || '').trim() || 'gemini-3.1-flash-lite-preview'
 }
 
 /**
