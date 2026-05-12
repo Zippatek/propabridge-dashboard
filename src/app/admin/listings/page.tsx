@@ -107,6 +107,34 @@ interface EditDrawerProps {
 }
 
 function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
+  // Re-fetch the listing fresh from the backend every time the drawer opens.
+  // The cached row in the parent listings array can be stale (loaded once on page
+  // mount, or modified in another tab/session), so without this the form would
+  // show pre-edit values even though the database is correct.
+  const [fresh, setFresh] = useState<AdminListing | null>(null)
+  const [loadErr, setLoadErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setFresh(null)
+    setLoadErr(null)
+    ;(async () => {
+      try {
+        const res = await be.get<{ data?: Record<string, unknown> } & Record<string, unknown>>(
+          `/listings/${encodeURIComponent(listing.id)}`,
+        )
+        const raw = (res?.data ?? res) as Record<string, unknown>
+        if (cancelled) return
+        // Merge the cached listing (preserves agency_name etc. from the listings query)
+        // with the canonical fresh row from the backend so every field is current.
+        setFresh({ ...listing, ...(raw as Partial<AdminListing>), id: String(raw.id ?? listing.id) })
+      } catch (e) {
+        if (!cancelled) setLoadErr((e as Error).message)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [listing.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
       <div
@@ -117,7 +145,7 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-divider flex-shrink-0">
           <div>
             <p className="text-caption text-subtle uppercase tracking-wide font-semibold">Edit Listing</p>
-            <h3 className="text-h4 text-navy mt-0.5 line-clamp-1">{listing.title || 'Untitled'}</h3>
+            <h3 className="text-h4 text-navy mt-0.5 line-clamp-1">{(fresh ?? listing).title || 'Untitled'}</h3>
           </div>
           <button
             onClick={onClose}
@@ -128,7 +156,13 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
         </div>
 
         <div className="flex-1 overflow-hidden">
-          <ListingEditForm listing={listing} onSaved={onSaved} onCancel={onClose} />
+          {loadErr ? (
+            <div className="px-6 py-5 text-sm text-danger">Couldn&apos;t load latest data: {loadErr}</div>
+          ) : !fresh ? (
+            <div className="px-6 py-5 text-sm text-subtle">Loading latest data…</div>
+          ) : (
+            <ListingEditForm listing={fresh} onSaved={onSaved} onCancel={onClose} />
+          )}
         </div>
       </div>
     </>
