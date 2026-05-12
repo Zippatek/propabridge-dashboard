@@ -717,7 +717,7 @@ export default function AdminListingsPage() {
                         {/* View on site */}
                         {l.slug && (
                           <a
-                            href={`https://propabridge.com/properties/${l.slug}`}
+                            href={`https://propabridge.com/properties-details/${l.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-button bg-beige text-subtle hover:text-action text-caption font-semibold transition-all duration-150"
