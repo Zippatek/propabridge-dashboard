@@ -3,10 +3,7 @@ import { isAdminAuthed } from '@/lib/admin-auth'
 import { proxyMultipartUpload } from '@/lib/admin-upload-proxy'
 
 /**
- * Proxy: POST /api/admin/upload-image  →  POST <backend>/listings/uploads/image
- *
- * Forwards multipart/form-data with the original boundary and attaches
- * x-admin-token server-side so the browser never sees the admin token.
+ * Proxy: POST /api/admin/upload-plan → POST <backend>/listings/uploads/plan
  */
 export const runtime = 'nodejs'
 
@@ -14,5 +11,5 @@ export async function POST(req: Request) {
   if (!isAdminAuthed()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  return proxyMultipartUpload(req, { backendPath: '/listings/uploads/image' })
+  return proxyMultipartUpload(req, { backendPath: '/listings/uploads/plan' })
 }

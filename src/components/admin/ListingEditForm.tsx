@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, Send, FileText, Check } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
 import { AdminListing } from '@/lib/types'
 import { ListingImageManager, ImageItem } from './ListingImageManager'
+import { ListingPlanUpload } from './ListingPlanUpload'
 
 interface ListingEditFormProps {
   listing: AdminListing
   onSaved: (updated: AdminListing) => void
   onCancel: () => void
+  /** Keeps the table row in sync when the floor plan is uploaded/removed without closing the drawer. */
+  onPlanPatch?: (patch: Partial<AdminListing>) => void
 }
 
 const PROPERTY_TYPES = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
@@ -32,7 +35,7 @@ function formatPrice(n?: number | null) {
   return `₦${n}`
 }
 
-export function ListingEditForm({ listing, onSaved, onCancel }: ListingEditFormProps) {
+export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: ListingEditFormProps) {
   const initialImages: ImageItem[] = (() => {
     const arr = Array.isArray(listing.images) ? listing.images : []
     if (arr.length === 0 && listing.cover_image_url) return [{ url: listing.cover_image_url, is_cover: true }]
@@ -90,8 +93,19 @@ export function ListingEditForm({ listing, onSaved, onCancel }: ListingEditFormP
     title_issuing_authority: listing.title_issuing_authority || '',
   })
   const [images, setImages] = useState<ImageItem[]>(initialImages)
+  const [plan, setPlan] = useState<{ url: string | null; fileName: string | null }>({
+    url: listing.plan_url ?? null,
+    fileName: listing.plan_file_name ?? null,
+  })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPlan({
+      url: listing.plan_url ?? null,
+      fileName: listing.plan_file_name ?? null,
+    })
+  }, [listing.id, listing.plan_url, listing.plan_file_name])
 
   const set = (k: string, v: unknown) => setForm(p => ({ ...p, [k]: v }))
 
@@ -147,6 +161,8 @@ export function ListingEditForm({ listing, onSaved, onCancel }: ListingEditFormP
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
         year_built: num(form.year_built as string),
+        plan_url: plan.url,
+        plan_file_name: plan.fileName,
       }
       for (const k of Object.keys(payload)) {
         if (payload[k] === undefined || payload[k] === null) delete payload[k]
@@ -160,6 +176,8 @@ export function ListingEditForm({ listing, onSaved, onCancel }: ListingEditFormP
         ...updatedData,
         images: images.map(i => i.url),
         cover_image_url: (images.find(i => i.is_cover) || images[0])?.url ?? null,
+        plan_url: plan.url,
+        plan_file_name: plan.fileName,
       })
     } catch (e) {
       setErr((e as Error).message)
@@ -194,6 +212,16 @@ export function ListingEditForm({ listing, onSaved, onCancel }: ListingEditFormP
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
         <ListingImageManager listingId={listing.id} initial={images} onPersisted={setImages} />
+
+        <ListingPlanUpload
+          listingId={listing.id}
+          planUrl={plan.url}
+          planFileName={plan.fileName}
+          onPersisted={(next) => {
+            setPlan(next)
+            onPlanPatch?.({ plan_url: next.url, plan_file_name: next.fileName })
+          }}
+        />
 
         <label className="block">
           <span className="text-caption text-subtle font-semibold mb-1.5 block">Title</span>

@@ -104,9 +104,11 @@ interface EditDrawerProps {
   listing: AdminListing
   onClose: () => void
   onSaved: (updated: AdminListing) => void
+  /** Keeps the table row in sync when plan is uploaded/removed without closing the drawer. */
+  onPlanPatch?: (patch: Partial<AdminListing>) => void
 }
 
-function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
+function EditDrawer({ listing, onClose, onSaved, onPlanPatch }: EditDrawerProps) {
   // Re-fetch the listing fresh from the backend every time the drawer opens.
   // The cached row in the parent listings array can be stale (loaded once on page
   // mount, or modified in another tab/session), so without this the form would
@@ -161,7 +163,15 @@ function EditDrawer({ listing, onClose, onSaved }: EditDrawerProps) {
           ) : !fresh ? (
             <div className="px-6 py-5 text-sm text-subtle">Loading latest data…</div>
           ) : (
-            <ListingEditForm listing={fresh} onSaved={onSaved} onCancel={onClose} />
+            <ListingEditForm
+              listing={fresh}
+              onSaved={onSaved}
+              onCancel={onClose}
+              onPlanPatch={(patch) => {
+                setFresh(prev => (prev ? { ...prev, ...patch } : prev))
+                onPlanPatch?.(patch)
+              }}
+            />
           )}
         </div>
       </div>
@@ -389,6 +399,8 @@ export default function AdminListingsPage() {
           declared_plot_size_sqm: item.declared_plot_size_sqm as number | null | undefined,
           units_available: item.units_available as number | null | undefined,
           year_built: item.year_built as number | null | undefined,
+          plan_url: item.plan_url as string | null | undefined,
+          plan_file_name: item.plan_file_name as string | null | undefined,
           latitude: item.latitude as number | null | undefined,
           longitude: item.longitude as number | null | undefined,
           cadastral_zone: item.cadastral_zone as string | null | undefined,
@@ -515,6 +527,14 @@ export default function AdminListingsPage() {
           listing={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={handleSaved}
+          onPlanPatch={(patch) => {
+            setEditTarget(t => {
+              if (!t) return t
+              const next = { ...t, ...patch } as AdminListing
+              upsertListingRow(next)
+              return next
+            })
+          }}
         />
       )}
 

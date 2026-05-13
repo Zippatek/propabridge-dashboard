@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { isAdminAuthed } from '@/lib/admin-auth'
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+/** Override with ANTHROPIC_AI_LISTING_MODEL. Sonnet 3.5 dated IDs are retired on the Claude API. */
+const DEFAULT_AI_LISTING_MODEL = 'claude-sonnet-4-6'
 
 // ─── Comprehensive question set (mirrors the agency listing wizard) ──────────
 
@@ -219,6 +218,22 @@ Format your response EXACTLY like this — description first, then the JSON bloc
 [/FIELDS]`
 }
 
+function extractDescriptionAndFields(raw: string): { description: string; fieldsJson: string } | null {
+  const descMatch = raw.match(/\[DESCRIPTION\]([\s\S]*?)\[\/DESCRIPTION\]/)
+  const fieldsMatch = raw.match(/\[FIELDS\]([\s\S]*?)\[\/FIELDS\]/)
+  if (descMatch && fieldsMatch) {
+    return { description: descMatch[1].trim(), fieldsJson: fieldsMatch[1].trim() }
+  }
+  // Fallback: fenced ```json ... ``` (some models omit the custom tags)
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fence) {
+    const jsonStr = fence[1].trim()
+    const description = raw.slice(0, raw.indexOf(fence[0])).trim() || ''
+    if (jsonStr.startsWith('{')) return { description, fieldsJson: jsonStr }
+  }
+  return null
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -226,9 +241,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          'AI listing is not configured: set ANTHROPIC_API_KEY in the dashboard environment (e.g. .env.local). Get a key from https://console.anthropic.com/settings/keys',
+      },
+      { status: 503 },
+    )
   }
 
   let answers: AiListingAnswers
@@ -239,9 +260,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  const model = process.env.ANTHROPIC_AI_LISTING_MODEL?.trim() || DEFAULT_AI_LISTING_MODEL
+  const client = new Anthropic({ apiKey })
+
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model,
       max_tokens: 3072,
       messages: [{ role: 'user', content: buildPrompt(answers) }],
     })
@@ -251,25 +275,38 @@ export async function POST(req: Request) {
       .map(b => (b as { type: 'text'; text: string }).text)
       .join('')
 
-    const descMatch = text.match(/\[DESCRIPTION\]([\s\S]*?)\[\/DESCRIPTION\]/)
-    const fieldsMatch = text.match(/\[FIELDS\]([\s\S]*?)\[\/FIELDS\]/)
-
-    if (!descMatch || !fieldsMatch) {
-      return NextResponse.json({ error: 'AI response format error — could not parse sections' }, { status: 500 })
+    const extracted = extractDescriptionAndFields(text)
+    if (!extracted) {
+      return NextResponse.json(
+        {
+          error:
+            'AI response format error — could not parse description/fields. Try again, or set ANTHROPIC_AI_LISTING_MODEL to a model that follows instructions reliably.',
+        },
+        { status: 502 },
+      )
     }
 
-    const description = descMatch[1].trim()
+    const description = extracted.description
     let fields: AiListingResponse['fields']
     try {
-      fields = JSON.parse(fieldsMatch[1].trim())
+      fields = JSON.parse(extracted.fieldsJson)
     } catch {
-      return NextResponse.json({ error: 'AI response format error — could not parse fields JSON' }, { status: 500 })
+      return NextResponse.json({ error: 'AI response format error — could not parse fields JSON' }, { status: 502 })
     }
 
     const result: AiListingResponse = { description, fields }
     return NextResponse.json(result)
   } catch (e) {
-    const err = e as Error
-    return NextResponse.json({ error: err.message || 'AI generation failed' }, { status: 500 })
+    const err = e as Error & { status?: number }
+    const msg = err.message || 'AI generation failed'
+    const isModel = /model|not_found|404/i.test(msg)
+    return NextResponse.json(
+      {
+        error: isModel
+          ? `${msg} — check ANTHROPIC_AI_LISTING_MODEL (default is ${DEFAULT_AI_LISTING_MODEL}).`
+          : msg,
+      },
+      { status: 502 },
+    )
   }
 }

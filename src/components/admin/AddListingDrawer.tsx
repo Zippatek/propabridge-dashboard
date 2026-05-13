@@ -24,6 +24,7 @@ import { be } from '@/lib/client-api'
 import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
 import { mergeParsedIntoAnswers, parseListingPasteFromText } from '@/lib/parse-listing-paste'
 import type { AiListingAnswers, AiListingResponse } from '@/app/api/admin/ai-listing/route'
+import { ListingPlanUpload } from '@/components/admin/ListingPlanUpload'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -486,6 +487,9 @@ function QuestionsStep({
             </>
           )}
         </button>
+        <p className="text-caption text-subtle text-center mt-2.5 leading-relaxed">
+          After this, <span className="text-navy font-medium">Step 2</span> is where you add photos and optionally upload a floor plan (shown as Download Plan on the website).
+        </p>
       </div>
     </div>
   )
@@ -662,6 +666,8 @@ interface ReviewFields {
   description: string
   amenities: string[]
   images: string[]
+  plan_url: string | null
+  plan_file_name: string | null
 }
 
 function ReviewStep({
@@ -713,6 +719,14 @@ function ReviewStep({
         <ImagesUploader
           images={fields.images}
           onChange={imgs => onChange({ ...fields, images: imgs })}
+        />
+
+        <ListingPlanUpload
+          planUrl={fields.plan_url}
+          planFileName={fields.plan_file_name}
+          onPersisted={next =>
+            onChange({ ...fields, plan_url: next.url, plan_file_name: next.fileName })
+          }
         />
 
         {/* Title */}
@@ -874,6 +888,8 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
     description: '',
     amenities: [],
     images: [],
+    plan_url: null,
+    plan_file_name: null,
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -910,6 +926,8 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         description:   data.description,
         amenities:     Array.isArray(f.amenities) && f.amenities.length ? f.amenities : (answers.amenities || []),
         images:        [],
+        plan_url:      null,
+        plan_file_name: null,
       })
       setStep('review')
     } catch (e) {
@@ -979,6 +997,8 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         amenities: reviewFields.amenities,
         images:    reviewFields.images,
         cover_image_url: reviewFields.images[0] || undefined,
+        plan_url:       reviewFields.plan_url || undefined,
+        plan_file_name: reviewFields.plan_file_name || undefined,
       }
 
       await be.send('/listings', 'POST', payload)

@@ -273,6 +273,8 @@ export interface AdminListing {
   title_holder_name?: string | null
   title_issued_date?: string | null
   title_issuing_authority?: string | null
+  plan_url?: string | null
+  plan_file_name?: string | null
 }
 
 export interface AdkListing {
