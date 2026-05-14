@@ -50,7 +50,11 @@ export async function proxyMultipartUpload(req: Request, { backendPath }: ProxyO
           body = { error: String(parsed) }
         }
       } catch {
-        body = { error: text.slice(0, 500) || `Upstream HTTP ${res.status}` }
+        // Upstream sometimes returns Express HTML (e.g. "Cannot POST …") — never forward raw HTML to the client.
+        const stripped = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        const fromPre = /<pre>([^<]*)<\/pre>/i.exec(text)
+        const msg = (fromPre?.[1] || stripped).slice(0, 500) || `Upstream HTTP ${res.status}`
+        body = { error: msg }
       }
     } else if (!res.ok) {
       body = { error: `Upstream HTTP ${res.status}` }
