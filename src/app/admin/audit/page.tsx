@@ -170,8 +170,8 @@ export default function AdminAuditPage() {
     if (preview) setAutofixContextModal(preview.user_context || '')
   }, [preview])
 
-  function issueRef(auditRowId: string, index: number) {
-    return `${auditRowId}:${index}`
+  function issueRef(findingHash: string) {
+    return findingHash
   }
 
   const normalizeListingTypeUi = (raw: string | null | undefined): string => {
@@ -688,7 +688,7 @@ export default function AdminAuditPage() {
                               type="button"
                               disabled={!!autofixLoading}
                               onClick={() =>
-                                dryRunAutofix(r.property_id, r.id, [issueRef(r.id, idx)])
+                                dryRunAutofix(r.property_id, r.id, [issueRef(issue.id)])
                               }
                               className="text-[10px] font-semibold uppercase tracking-wide text-action hover:underline disabled:opacity-50"
                             >
