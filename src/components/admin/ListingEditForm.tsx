@@ -16,7 +16,6 @@ interface ListingEditFormProps {
   onPlanPatch?: (patch: Partial<AdminListing>) => void
 }
 
-const PROPERTY_TYPES = ['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse']
 const VERIFY_STATUSES = ['draft', 'submitted', 'in_review', 'needs_info', 'verified', 'rejected']
 const CONSTRUCTION_STATUS_OPTS = [
   ['', '—'],
@@ -99,6 +98,16 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
   })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [propertyTypes, setPropertyTypes] = useState<string[]>(['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse'])
+
+  useEffect(() => {
+    be.get<any>('/listings/filters').then(res => {
+      const raw = res?.data || res || []
+      if (Array.isArray(raw)) {
+        setPropertyTypes(raw.map((t: any) => t.slug))
+      }
+    }).catch(console.error)
+  }, [])
 
   useEffect(() => {
     setPlan({
@@ -427,7 +436,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
                 value={form.property_type}
                 onChange={e => set('property_type', e.target.value)}
               >
-                {PROPERTY_TYPES.map(t => (
+                {propertyTypes.map(t => (
                   <option key={t} value={t}>
                     {t}
                   </option>
