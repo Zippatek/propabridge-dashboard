@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
+import { useCallback, useState } from 'react'
 import {
   ShieldCheck,
   MapPin,
@@ -21,6 +20,7 @@ import {
 import { runGeoSanityChecks, parsePolygon, polygonAreaM2, polygonCentroid } from '@/lib/verification/geoChecks'
 import type { ClientFinding } from '@/lib/verification/findings'
 import { be } from '@/lib/client-api'
+import { FootprintMapPreview } from './FootprintMapPreview'
 
 /* ───────────────────────── Types ──────────────────────────────────────────── */
 
@@ -78,154 +78,8 @@ export function ManualVerificationPanel() {
   const [footprintError, setFootprintError] = useState<string | null>(null)
   const [hasRun, setHasRun] = useState(false)
 
-  // Map
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markerRef = useRef<mapboxgl.Marker | null>(null)
-  const mbxRef = useRef<typeof mapboxgl | null>(null)
+  // Map state is handled by FootprintMapPreview now
 
-  // ── Initialize map ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!mapContainerRef.current) return
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-    if (!token) return
-
-    mapboxgl.accessToken = token
-
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [7.49, 9.06],
-      zoom: 11,
-      interactive: true,
-      attributionControl: false,
-    })
-
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
-    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150 }), 'bottom-left')
-
-    mapRef.current = map
-    mbxRef.current = mapboxgl
-
-    return () => {
-      markerRef.current?.remove()
-      map.remove()
-      mapRef.current = null
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Update map when lat/lng change ────────────────────────────────────────
-  const updateMapMarker = useCallback(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const latN = parseFloat(lat)
-    const lngN = parseFloat(lng)
-    if (isNaN(latN) || isNaN(lngN)) {
-      markerRef.current?.remove()
-      markerRef.current = null
-      return
-    }
-
-    if (!markerRef.current) {
-      const mbx = mbxRef.current
-      if (!mbx) return
-      const el = document.createElement('div')
-      el.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:#006aff;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`
-      markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lngN, latN]).addTo(map)
-    } else {
-      markerRef.current.setLngLat([lngN, latN])
-    }
-
-    map.flyTo({ center: [lngN, latN], zoom: 17, duration: 1200 })
-  }, [lat, lng])
-
-  useEffect(() => {
-    const timeout = setTimeout(updateMapMarker, 400)
-    return () => clearTimeout(timeout)
-  }, [updateMapMarker])
-
-  // ── Update map polygon layer ──────────────────────────────────────────────
-  const updateMapPolygon = useCallback(() => {
-    const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-
-    // Remove existing layers/sources
-    try {
-      if (map.getLayer('manual-polygon-fill')) map.removeLayer('manual-polygon-fill')
-      if (map.getLayer('manual-polygon-outline')) map.removeLayer('manual-polygon-outline')
-      if (map.getSource('manual-polygon')) map.removeSource('manual-polygon')
-    } catch { /* ignore */ }
-
-    const parsed = parsePolygon(polygonJson)
-    if (!parsed) return
-
-    map.addSource('manual-polygon', {
-      type: 'geojson',
-      data: { type: 'Feature', geometry: parsed, properties: {} },
-    })
-    map.addLayer({
-      id: 'manual-polygon-fill',
-      type: 'fill',
-      source: 'manual-polygon',
-      paint: { 'fill-color': '#006aff', 'fill-opacity': 0.18 },
-    })
-    map.addLayer({
-      id: 'manual-polygon-outline',
-      type: 'line',
-      source: 'manual-polygon',
-      paint: { 'line-color': '#006aff', 'line-width': 2.5, 'line-dasharray': [3, 1.5] },
-    })
-
-    // Fit bounds
-    const coords = parsed.coordinates[0]
-    if (coords?.length > 2) {
-      const mbx = mbxRef.current
-      if (!mbx) return
-      const bounds = coords.reduce(
-        (b, c) => b.extend(c as [number, number]),
-        new mapboxgl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]),
-      )
-      map.fitBounds(bounds, { padding: 80, maxZoom: 19, duration: 800 })
-    }
-  }, [polygonJson])
-
-  useEffect(() => {
-    const timeout = setTimeout(updateMapPolygon, 500)
-    return () => clearTimeout(timeout)
-  }, [updateMapPolygon])
-
-  // ── Update footprint buildings on map ─────────────────────────────────────
-  const updateMapFootprints = useCallback((result: FootprintResult | null) => {
-    const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-
-    try {
-      if (map.getLayer('manual-footprints-fill')) map.removeLayer('manual-footprints-fill')
-      if (map.getLayer('manual-footprints-outline')) map.removeLayer('manual-footprints-outline')
-      if (map.getSource('manual-footprints')) map.removeSource('manual-footprints')
-    } catch { /* ignore */ }
-
-    if (!result?.building_footprints?.features?.length) return
-
-    map.addSource('manual-footprints', {
-      type: 'geojson',
-      data: result.building_footprints,
-    })
-    map.addLayer({
-      id: 'manual-footprints-fill',
-      type: 'fill',
-      source: 'manual-footprints',
-      paint: { 'fill-color': '#f97316', 'fill-opacity': 0.4 },
-    })
-    map.addLayer({
-      id: 'manual-footprints-outline',
-      type: 'line',
-      source: 'manual-footprints',
-      paint: { 'line-color': '#f97316', 'line-width': 1.5 },
-    })
-  }, [])
 
   // ── Run checks ────────────────────────────────────────────────────────────
   const runChecks = async () => {
@@ -270,7 +124,6 @@ export function ManualVerificationPanel() {
         },
       )
       setFootprintResult(data)
-      updateMapFootprints(data)
     } catch (e) {
       const msg = (e as Error).message || 'Footprint check failed'
       if (msg.includes('not yet loaded') || msg.includes('503') || msg.includes('not found')) {
@@ -439,7 +292,7 @@ export function ManualVerificationPanel() {
 
         {/* Right — Map + Legend */}
         <div className="lg:col-span-3 space-y-3">
-          <div className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
+          <div className="bg-white rounded-card border border-divider shadow-card overflow-hidden flex flex-col">
             <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
               <Layers size={14} className="text-action" />
               <span className="text-body-sm font-semibold text-navy">Satellite View</span>
@@ -449,15 +302,20 @@ export function ManualVerificationPanel() {
                 </span>
               )}
             </div>
-            <div
-              ref={mapContainerRef}
-              className="w-full"
-              style={{ height: 480 }}
-            />
+            
+            <div className="w-full relative bg-[#e5e3df]" style={{ height: 480 }}>
+              <FootprintMapPreview
+                listingPolygon={parsed}
+                buildingFootprints={footprintResult?.building_footprints ?? null}
+                latitude={lat.trim() ? parseFloat(lat) : null}
+                longitude={lng.trim() ? parseFloat(lng) : null}
+              />
+            </div>
+
             {/* Map legend */}
-            <div className="px-4 py-2.5 bg-beige/40 border-t border-divider flex items-center gap-5 text-[10px] text-navy">
+            <div className="px-4 py-2.5 bg-beige/40 border-t border-divider flex flex-wrap items-center gap-5 text-[10px] text-navy">
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm border-2 border-[#006aff] bg-[#006aff]/20 flex-shrink-0" />
+                <span className="w-3 h-3 rounded-sm border-2 border-[#2563eb] bg-[#2563eb]/20 flex-shrink-0" />
                 Declared plot boundary
               </div>
               <div className="flex items-center gap-1.5">
@@ -465,7 +323,7 @@ export function ManualVerificationPanel() {
                 Google Open Buildings (v3)
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-[#006aff] border-2 border-white shadow flex-shrink-0" />
+                <span className="w-3 h-3 rounded-full bg-[#2563eb] border-2 border-white shadow flex-shrink-0" />
                 Declared coordinates
               </div>
             </div>

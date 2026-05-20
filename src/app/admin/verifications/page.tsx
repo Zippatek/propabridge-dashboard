@@ -487,12 +487,14 @@ export default function AdminVerificationsPage() {
                     <AutoFindingRow key={i} f={f} />
                   ))}
                 </ul>
-                <FootprintMapPreview
-                  listingPolygon={footprintResult.listing_polygon ?? null}
-                  buildingFootprints={footprintResult.building_footprints ?? null}
-                  latitude={lat}
-                  longitude={lng}
-                />
+                <div className="w-full relative rounded border border-divider overflow-hidden" style={{ height: 340 }}>
+                  <FootprintMapPreview
+                    listingPolygon={footprintResult.listing_polygon ?? null}
+                    buildingFootprints={footprintResult.building_footprints ?? null}
+                    latitude={lat}
+                    longitude={lng}
+                  />
+                </div>
               </div>
             ) : (
               <p className="text-caption text-subtle">
