@@ -16,6 +16,9 @@ import {
   Building2,
   FileSearch,
   Crosshair,
+  Satellite,
+  Brain,
+  Layers,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { formatDateTime } from '@/lib/format'
@@ -367,6 +370,24 @@ export default function AdminVerificationsPage() {
     const [footprintLoading, setFootprintLoading] = useState(false)
     const [footprintErr, setFootprintErr] = useState<string | null>(null)
 
+    interface SatelliteAnalysis {
+      structures_visible: number
+      estimated_plot_size: string
+      land_use: string
+      construction_stage: string
+      vegetation_coverage: string
+      road_access: string
+      neighbouring_density: string
+      anomalies: string[]
+      property_type_match: string
+      confidence: number
+      ai_summary: string
+    }
+    interface SatelliteResult { analysis: SatelliteAnalysis; findings: ClientFinding[]; center: { lat: number; lng: number } }
+    const [satResult, setSatResult] = useState<SatelliteResult | null>(null)
+    const [satLoading, setSatLoading] = useState(false)
+    const [satErr, setSatErr] = useState<string | null>(null)
+
     const runFootprintCheck = async () => {
       if (!listingId) return
       setFootprintLoading(true)
@@ -388,6 +409,22 @@ export default function AdminVerificationsPage() {
       }
     }
 
+    const runSatelliteAnalysis = async () => {
+      if (!listingId) return
+      setSatLoading(true)
+      setSatErr(null)
+      try {
+        const res = await fetch(`/api/admin/satellite-analysis?listing_id=${listingId}`)
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Analysis failed')
+        setSatResult(data as SatelliteResult)
+      } catch (e) {
+        setSatErr((e as Error).message)
+      } finally {
+        setSatLoading(false)
+      }
+    }
+
     const geoFindings: ClientFinding[] = runGeoSanityChecks({
       latitude: lat,
       longitude: lng,
@@ -398,6 +435,7 @@ export default function AdminVerificationsPage() {
     const allFindings = [
       ...geoFindings,
       ...(footprintResult?.findings ?? []),
+      ...(satResult?.findings ?? []),
     ]
     const passCount = allFindings.filter(f => f.state === 'pass').length
     const failCount = allFindings.filter(f => f.state === 'fail').length
@@ -434,11 +472,11 @@ export default function AdminVerificationsPage() {
             )}
           </div>
 
-          {/* Google Open Buildings footprint check */}
+          {/* Satellite-detected structures (Google Open Buildings v3) */}
           <div className="px-6 py-4">
             <div className="flex items-center gap-1.5 mb-3">
-              <Building2 size={13} className="text-subtle" />
-              <span className="text-body-sm font-semibold text-navy">Building Footprint</span>
+              <Layers size={13} className="text-subtle" />
+              <span className="text-body-sm font-semibold text-navy">Satellite-Detected Structures</span>
               <span className="ml-auto">
                 <button
                   type="button"
@@ -498,7 +536,81 @@ export default function AdminVerificationsPage() {
               </div>
             ) : (
               <p className="text-caption text-subtle">
-                Click <strong>Run check</strong> to cross-check the drawn polygon against Google Open Buildings v3 footprints for Abuja.
+                Click <strong>Run check</strong> to cross-check this listing&apos;s location against satellite-detected building structures for Abuja.
+              </p>
+            )}
+          </div>
+
+          {/* AI Vision Satellite Analysis */}
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Brain size={13} className="text-action" />
+              <span className="text-body-sm font-semibold text-navy">AI Vision Analysis</span>
+              <span className="ml-1 text-[10px] bg-action/10 text-action px-1.5 py-0.5 rounded-full font-semibold">Gemini</span>
+              <span className="ml-auto">
+                <button
+                  type="button"
+                  onClick={runSatelliteAnalysis}
+                  disabled={satLoading || !listingId}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded text-caption font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
+                >
+                  {satLoading ? (
+                    <><RefreshCw size={10} className="animate-spin" /> Analysing…</>
+                  ) : (
+                    <><Brain size={10} /> Analyse</>
+                  )}
+                </button>
+              </span>
+            </div>
+            {satErr ? (
+              <p className="text-caption text-danger">{satErr}</p>
+            ) : satResult ? (
+              <div className="space-y-3">
+                {/* AI summary */}
+                <p className="text-caption text-navy bg-action/5 border border-action/20 rounded px-3 py-2 leading-relaxed">
+                  {satResult.analysis.ai_summary}
+                </p>
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                  {[
+                    ['Structures visible', satResult.analysis.structures_visible],
+                    ['Plot size', satResult.analysis.estimated_plot_size],
+                    ['Land use', satResult.analysis.land_use],
+                    ['Construction', satResult.analysis.construction_stage?.replace(/_/g, ' ')],
+                    ['Road access', satResult.analysis.road_access],
+                    ['Neighbour density', satResult.analysis.neighbouring_density],
+                    ['Vegetation', satResult.analysis.vegetation_coverage],
+                    ['Type match', satResult.analysis.property_type_match],
+                  ].map(([label, val]) => (
+                    <div key={label as string}>
+                      <span className="text-placeholder">{label}: </span>
+                      <span className={`font-semibold ${
+                        val === 'mismatch' ? 'text-danger' :
+                        val === 'match' ? 'text-success' : 'text-navy'
+                      }`}>{String(val ?? '—')}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Anomalies */}
+                {satResult.analysis.anomalies?.length > 0 && (
+                  <div className="text-[11px] bg-warning/5 border border-warning/20 rounded px-3 py-2">
+                    <p className="font-semibold text-warning mb-1">Anomalies detected</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-navy">
+                      {satResult.analysis.anomalies.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {/* Findings */}
+                <ul className="space-y-1.5">
+                  {satResult.findings.map((f, i) => <AutoFindingRow key={i} f={f} />)}
+                </ul>
+                <p className="text-[10px] text-placeholder">
+                  AI confidence: {(satResult.analysis.confidence * 100).toFixed(0)}% · Powered by Gemini Vision · Satellite © Google Maps Static API
+                </p>
+              </div>
+            ) : (
+              <p className="text-caption text-subtle">
+                Click <strong>Analyse</strong> to run Gemini Vision on the satellite image of this property — checks construction stage, land use, building count, and flags anomalies.
               </p>
             )}
           </div>

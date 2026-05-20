@@ -162,7 +162,7 @@ export function FootprintMapPreview({ height = '100%', ...props }: Props) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded-sm border-2 border-[#f97316] bg-[#f97316]/35 flex-shrink-0" />
-          <span className="text-navy">Google Open Buildings (v3)</span>
+          <span className="text-navy">Satellite-Detected Structures</span>
         </div>
       </div>
     </div>
