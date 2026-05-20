@@ -18,7 +18,7 @@ interface Props {
   buildingFootprints: FeatureCollection | null
   latitude?: number | null
   longitude?: number | null
-  height?: number
+  height?: number | string
 }
 
 function DataLayers({
@@ -42,15 +42,22 @@ function DataLayers({
     let hasBounds = false
 
     if (listingPolygon) {
+      // Unwrap Feature → raw Geometry if backend returns a GeoJSON Feature object
+      const geom: GeoJsonPolygon =
+        (listingPolygon as unknown as { type: string; geometry: GeoJsonPolygon }).type === 'Feature'
+          ? (listingPolygon as unknown as { geometry: GeoJsonPolygon }).geometry
+          : listingPolygon
       map.data.addGeoJson({
         type: 'Feature',
-        geometry: listingPolygon,
+        geometry: geom,
         properties: { isListing: true },
       })
-      listingPolygon.coordinates[0].forEach(([lng, lat]) => {
-        bounds.extend({ lat, lng })
-        hasBounds = true
-      })
+      if (geom?.coordinates?.[0]) {
+        geom.coordinates[0].forEach(([lng, lat]) => {
+          bounds.extend({ lat, lng })
+          hasBounds = true
+        })
+      }
     }
 
     if (buildingFootprints && buildingFootprints.features.length > 0) {
@@ -129,7 +136,7 @@ function DataLayers({
   return null
 }
 
-export function FootprintMapPreview({ height = '100%', ...props }: Props & { height?: number | string }) {
+export function FootprintMapPreview({ height = '100%', ...props }: Props) {
   const tokenMissing = !process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
   if (tokenMissing) {
     return <div style={{ height }} className="bg-beige flex items-center justify-center text-subtle text-caption">Map unavailable (No API Key)</div>
@@ -138,14 +145,26 @@ export function FootprintMapPreview({ height = '100%', ...props }: Props & { hei
   return (
     <div className="relative w-full h-full" style={{ height }}>
       <Map
+        style={{ width: '100%', height: '100%' }}
         defaultCenter={{ lat: 9.06, lng: 7.49 }}
         defaultZoom={12}
         mapTypeId="satellite"
-        disableDefaultUI={true}
+        disableDefaultUI={false}
         gestureHandling="greedy"
       >
         <DataLayers {...props} />
       </Map>
+      {/* Legend */}
+      <div className="absolute bottom-8 left-3 bg-white/90 backdrop-blur-sm rounded px-2.5 py-1.5 shadow text-[10px] space-y-1 pointer-events-none">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded-sm border-2 border-[#2563eb] bg-[#2563eb]/20 flex-shrink-0" />
+          <span className="text-navy">Declared plot boundary</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded-sm border-2 border-[#f97316] bg-[#f97316]/35 flex-shrink-0" />
+          <span className="text-navy">Google Open Buildings (v3)</span>
+        </div>
+      </div>
     </div>
   )
 }
