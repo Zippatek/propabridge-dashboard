@@ -11,14 +11,18 @@ import {
   XCircle,
   RefreshCw,
   ChevronRight,
-  X,
   ArrowLeft,
+  MapPin,
+  Building2,
+  FileSearch,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { formatDateTime } from '@/lib/format'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 import { Button } from '@/components/ui/Button'
 import { StatCard } from '@/components/ui/StatCard'
+import { runGeoSanityChecks } from '@/lib/verification/geoChecks'
+import type { ClientFinding } from '@/lib/verification/findings'
 
 interface VerificationItem {
   listing_id: string
@@ -307,6 +311,9 @@ export default function AdminVerificationsPage() {
           )}
         </section>
 
+        {/* Automated checks */}
+        <AutomatedChecksCard listing={detail.listing} />
+
         {/* Verification record */}
         {detail.verification && (
           <section className="bg-white rounded-card border border-divider shadow-card p-6">
@@ -330,6 +337,192 @@ export default function AdminVerificationsPage() {
   }
 
   if (selectedId && detailLoading) return <PageLoading />
+
+  // ── Automated checks helper components ───────────────────────────────────
+  function AutomatedChecksCard({ listing }: { listing: Record<string, unknown> }) {
+    const listingId = typeof listing.id === 'string' ? listing.id : null
+    const lat = typeof listing.latitude === 'number' ? listing.latitude : null
+    const lng = typeof listing.longitude === 'number' ? listing.longitude : null
+    const polygon = typeof listing.polygon_geojson === 'string' ? listing.polygon_geojson : null
+    const propertyType = typeof listing.property_type === 'string' ? listing.property_type : null
+    const cacRc = typeof listing.cac_rc_number === 'string' ? listing.cac_rc_number : null
+
+    const [footprintResult, setFootprintResult] = useState<{
+      available: boolean
+      buildings_inside_count: number
+      total_footprint_area_m2: number
+      polygon_area_m2: number | null
+      coverage_ratio: number | null
+      findings: ClientFinding[]
+    } | null>(null)
+    const [footprintLoading, setFootprintLoading] = useState(false)
+    const [footprintErr, setFootprintErr] = useState<string | null>(null)
+
+    const runFootprintCheck = async () => {
+      if (!listingId) return
+      setFootprintLoading(true)
+      setFootprintErr(null)
+      try {
+        const data = await be.get<typeof footprintResult>(`/listings/${listingId}/footprint-check`)
+        setFootprintResult(data)
+      } catch (e) {
+        const msg = (e as Error).message || 'Footprint check failed'
+        if (msg.includes('not yet loaded') || msg.includes('503')) {
+          setFootprintErr('dataset_pending')
+        } else {
+          setFootprintErr(msg)
+        }
+      } finally {
+        setFootprintLoading(false)
+      }
+    }
+
+    const geoFindings: ClientFinding[] = runGeoSanityChecks({
+      latitude: lat,
+      longitude: lng,
+      polygon_geojson: polygon,
+      property_type: propertyType,
+    })
+
+    const allFindings = [
+      ...geoFindings,
+      ...(footprintResult?.findings ?? []),
+    ]
+    const passCount = allFindings.filter(f => f.state === 'pass').length
+    const failCount = allFindings.filter(f => f.state === 'fail').length
+    const hasCoords = lat != null && lng != null
+
+    return (
+      <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-divider flex items-center gap-2">
+          <ShieldCheck size={16} className="text-action" />
+          <h2 className="text-h4 text-navy">Automated Checks</h2>
+          <span className="ml-auto text-caption text-subtle">
+            {passCount} pass · {failCount} fail
+          </span>
+        </div>
+        <div className="divide-y divide-divider">
+
+          {/* Geo sanity */}
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <MapPin size={13} className="text-subtle" />
+              <span className="text-body-sm font-semibold text-navy">Geo Sanity</span>
+              {!hasCoords && (
+                <span className="ml-2 text-caption text-placeholder">No coordinates on listing</span>
+              )}
+            </div>
+            {geoFindings.length === 0 ? (
+              <p className="text-caption text-subtle">No geo data to check.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {geoFindings.map((f, i) => (
+                  <AutoFindingRow key={i} f={f} />
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Google Open Buildings footprint check */}
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Building2 size={13} className="text-subtle" />
+              <span className="text-body-sm font-semibold text-navy">Building Footprint</span>
+              <span className="ml-auto">
+                <button
+                  type="button"
+                  onClick={runFootprintCheck}
+                  disabled={footprintLoading || !listingId}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded text-caption font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
+                >
+                  {footprintLoading ? (
+                    <><RefreshCw size={10} className="animate-spin" /> Checking…</>
+                  ) : (
+                    <><Building2 size={10} /> Run check</>
+                  )}
+                </button>
+              </span>
+            </div>
+            {footprintErr === 'dataset_pending' ? (
+              <p className="text-caption text-subtle leading-relaxed">
+                The Google Open Buildings v3 dataset for FCT is not yet loaded into the database.
+                Run <code className="text-[11px] bg-beige px-1 rounded">python scripts/export_open_buildings.py</code>{' '}
+                then <code className="text-[11px] bg-beige px-1 rounded">bash scripts/load_footprints.sh</code> to populate it.
+              </p>
+            ) : footprintErr ? (
+              <p className="text-caption text-danger">{footprintErr}</p>
+            ) : footprintResult ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-3 text-[11px]">
+                  <div>
+                    <p className="text-placeholder">Buildings inside</p>
+                    <p className="font-semibold text-navy">{footprintResult.buildings_inside_count}</p>
+                  </div>
+                  <div>
+                    <p className="text-placeholder">Footprint area</p>
+                    <p className="font-semibold text-navy">{footprintResult.total_footprint_area_m2.toFixed(0)} m²</p>
+                  </div>
+                  <div>
+                    <p className="text-placeholder">Coverage</p>
+                    <p className="font-semibold text-navy">
+                      {footprintResult.coverage_ratio != null
+                        ? `${(footprintResult.coverage_ratio * 100).toFixed(1)}%`
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+                <ul className="space-y-1.5">
+                  {footprintResult.findings.map((f, i) => (
+                    <AutoFindingRow key={i} f={f} />
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-caption text-subtle">
+                Click <strong>Run check</strong> to cross-check the drawn polygon against Google Open Buildings v3 footprints for Abuja.
+              </p>
+            )}
+          </div>
+
+          {/* CAC quick-verify */}
+          {cacRc && (
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <FileSearch size={13} className="text-subtle" />
+                <span className="text-body-sm font-semibold text-navy">CAC Registration</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="text-caption text-subtle">RC #{cacRc}</p>
+                <a
+                  href="https://search.cac.gov.ng/home"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-caption font-semibold bg-beige border border-divider text-navy hover:text-action hover:border-action transition-colors"
+                >
+                  <FileSearch size={11} /> Verify on CAC
+                </a>
+                <span className="text-[10px] text-placeholder">Search for RC #{cacRc}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  function AutoFindingRow({ f }: { f: ClientFinding }) {
+    const icon = f.state === 'pass'
+      ? <CheckCircle2 size={13} className="text-verified flex-shrink-0 mt-0.5" />
+      : f.severity === 'block'
+        ? <XCircle size={13} className="text-danger flex-shrink-0 mt-0.5" />
+        : <AlertTriangle size={13} className="text-warning flex-shrink-0 mt-0.5" />
+    return (
+      <li className="flex items-start gap-2">
+        {icon}
+        <span className="text-body-sm text-navy">{f.message}</span>
+      </li>
+    )
+  }
 
   // ── List view ────────────────────────────────────────────────────────────
   return (
