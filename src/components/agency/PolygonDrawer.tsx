@@ -165,6 +165,7 @@ export function PolygonDrawer({
         style={{ height: 360 }}
       >
         <Map
+          style={{ width: '100%', height: '100%' }}
           mapId="propabridge-polygon-drawer"
           defaultCenter={{ lat: initialCenter[1], lng: initialCenter[0] }}
           defaultZoom={initialZoom}

@@ -311,22 +311,6 @@ export function ManualVerificationPanel() {
                 longitude={lng.trim() ? parseFloat(lng) : null}
               />
             </div>
-
-            {/* Map legend */}
-            <div className="px-4 py-2.5 bg-beige/40 border-t border-divider flex flex-wrap items-center gap-5 text-[10px] text-navy">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm border-2 border-[#2563eb] bg-[#2563eb]/20 flex-shrink-0" />
-                Declared plot boundary
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm border-2 border-orange-500 bg-orange-500/40 flex-shrink-0" />
-                Google Open Buildings (v3)
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-[#2563eb] border-2 border-white shadow flex-shrink-0" />
-                Declared coordinates
-              </div>
-            </div>
           </div>
 
           {/* Quick info cards — show after running */}
