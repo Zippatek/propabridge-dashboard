@@ -15,6 +15,7 @@ import {
   MapPin,
   Building2,
   FileSearch,
+  Crosshair,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { formatDateTime } from '@/lib/format'
@@ -24,6 +25,9 @@ import { StatCard } from '@/components/ui/StatCard'
 import { runGeoSanityChecks } from '@/lib/verification/geoChecks'
 import type { ClientFinding } from '@/lib/verification/findings'
 import { FootprintMapPreview } from '@/components/admin/FootprintMapPreview'
+import { ManualVerificationPanel } from '@/components/admin/ManualVerificationPanel'
+
+type ViewMode = 'queue' | 'manual'
 
 interface VerificationItem {
   listing_id: string
@@ -71,6 +75,7 @@ const STATUS_TABS: { label: string; value: StatusFilter | 'pending'; color: stri
 ]
 
 export default function AdminVerificationsPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('queue')
   const [items, setItems] = useState<VerificationItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -539,10 +544,44 @@ export default function AdminVerificationsPage() {
   // ── List view ────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h3 text-navy">Verification Queue</h1>
-        <p className="text-body-sm text-subtle mt-1">Review and verify property listings</p>
+      {/* ── Top-level mode toggle ────────────────────────────────────────── */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-h3 text-navy">Verification</h1>
+          <p className="text-body-sm text-subtle mt-1">Review listings or run ad-hoc checks</p>
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-divider shadow-sm">
+          <button
+            onClick={() => setViewMode('queue')}
+            className={`px-4 py-2 text-body-sm font-semibold transition-all duration-150 flex items-center gap-2 ${
+              viewMode === 'queue'
+                ? 'bg-action text-white'
+                : 'bg-white text-subtle hover:bg-beige hover:text-navy'
+            }`}
+          >
+            <ClipboardCheck size={14} />
+            Queue
+          </button>
+          <button
+            onClick={() => setViewMode('manual')}
+            className={`px-4 py-2 text-body-sm font-semibold transition-all duration-150 flex items-center gap-2 border-l border-divider ${
+              viewMode === 'manual'
+                ? 'bg-action text-white'
+                : 'bg-white text-subtle hover:bg-beige hover:text-navy'
+            }`}
+          >
+            <Crosshair size={14} />
+            Manual Check
+          </button>
+        </div>
       </div>
+
+      {/* ── Manual verification mode ─────────────────────────────────────── */}
+      {viewMode === 'manual' ? (
+        <ManualVerificationPanel />
+      ) : (
+      /* ── Queue mode (existing content) ───────────────────────────────── */
+      <>
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -644,6 +683,7 @@ export default function AdminVerificationsPage() {
           </div>
         )}
       </section>
+    </>)}
     </div>
   )
 }
