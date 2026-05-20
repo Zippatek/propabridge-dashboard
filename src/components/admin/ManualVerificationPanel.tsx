@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type mapboxgl from 'mapbox-gl'
+import mapboxgl from 'mapbox-gl'
 import {
   ShieldCheck,
   MapPin,
@@ -82,7 +82,7 @@ export function ManualVerificationPanel() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markerRef = useRef<mapboxgl.Marker | null>(null)
-  const mbxRef = useRef<typeof import('mapbox-gl') | null>(null)
+  const mbxRef = useRef<typeof mapboxgl | null>(null)
 
   // ── Initialize map ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -90,33 +90,27 @@ export function ManualVerificationPanel() {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
     if (!token) return
 
-    let cancelled = false
+    mapboxgl.accessToken = token
 
-    import('mapbox-gl').then((mbx) => {
-      if (cancelled || !mapContainerRef.current) return
-      mbxRef.current = mbx
-      mbx.default.accessToken = token
-
-      const map = new mbx.default.Map({
-        container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/satellite-streets-v12',
-        center: [7.49, 9.06],
-        zoom: 11,
-        interactive: true,
-        attributionControl: false,
-      })
-
-      map.addControl(new mbx.default.NavigationControl({ showCompass: false }), 'top-right')
-      map.addControl(new mbx.default.AttributionControl({ compact: true }), 'bottom-right')
-      map.addControl(new mbx.default.ScaleControl({ maxWidth: 150 }), 'bottom-left')
-
-      mapRef.current = map
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: 'mapbox://styles/mapbox/satellite-streets-v12',
+      center: [7.49, 9.06],
+      zoom: 11,
+      interactive: true,
+      attributionControl: false,
     })
 
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150 }), 'bottom-left')
+
+    mapRef.current = map
+    mbxRef.current = mapboxgl
+
     return () => {
-      cancelled = true
       markerRef.current?.remove()
-      mapRef.current?.remove()
+      map.remove()
       mapRef.current = null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -139,7 +133,7 @@ export function ManualVerificationPanel() {
       if (!mbx) return
       const el = document.createElement('div')
       el.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:#006aff;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`
-      markerRef.current = new mbx.default.Marker({ element: el }).setLngLat([lngN, latN]).addTo(map)
+      markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lngN, latN]).addTo(map)
     } else {
       markerRef.current.setLngLat([lngN, latN])
     }
@@ -191,7 +185,7 @@ export function ManualVerificationPanel() {
       if (!mbx) return
       const bounds = coords.reduce(
         (b, c) => b.extend(c as [number, number]),
-        new mbx.default.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]),
+        new mapboxgl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]),
       )
       map.fitBounds(bounds, { padding: 80, maxZoom: 19, duration: 800 })
     }
