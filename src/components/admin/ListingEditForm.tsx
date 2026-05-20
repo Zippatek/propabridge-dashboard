@@ -412,6 +412,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
               />
             </label>
             <TitleDocumentManager
+              listingId={listing.id}
               initial={titleDocs}
               onChange={setTitleDocs}
               titleSnapshot={{

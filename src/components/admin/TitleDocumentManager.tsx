@@ -13,6 +13,7 @@ interface TitleFormSnapshot {
 }
 
 interface Props {
+  listingId: string
   initial: string[]
   // Called whenever the document list changes. Parent persists via the main
   // listing PATCH so we don't need a dedicated endpoint yet.
@@ -22,7 +23,7 @@ interface Props {
   titleSnapshot: TitleFormSnapshot
 }
 
-export function TitleDocumentManager({ initial, onChange, titleSnapshot }: Props) {
+export function TitleDocumentManager({ listingId, initial, onChange, titleSnapshot }: Props) {
   const [docs, setDocs] = useState<string[]>(initial)
   const [uploading, setUploading] = useState(false)
   const [verifyingIdx, setVerifyingIdx] = useState<number | null>(null)
@@ -32,6 +33,24 @@ export function TitleDocumentManager({ initial, onChange, titleSnapshot }: Props
   const update = (next: string[]) => {
     setDocs(next)
     onChange(next)
+  }
+
+  const checkDuplicate = async (url: string): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/admin/check-doc-duplicate', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ documentUrl: url, listingId }),
+      })
+      const json = await res.json()
+      if (json.duplicate) {
+        return `Duplicate document detected — this same scan was previously uploaded on listing ${String(json.previous_listing_id).substring(0, 8)}….`
+      }
+      return null
+    } catch {
+      return null // degrade gracefully if the backend table isn't ready
+    }
   }
 
   const handleFiles = async (files: FileList | null) => {
@@ -54,6 +73,11 @@ export function TitleDocumentManager({ initial, onChange, titleSnapshot }: Props
         }
         const { url } = await res.json()
         next.push(url)
+
+        // Async duplicate check — surfaces as a warning, does not block upload.
+        checkDuplicate(url).then(warning => {
+          if (warning) setErr(warning)
+        })
       }
       update(next)
     } catch (e) {

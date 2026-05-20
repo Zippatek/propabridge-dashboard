@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/Button'
 import { StatCard } from '@/components/ui/StatCard'
 import { runGeoSanityChecks } from '@/lib/verification/geoChecks'
 import type { ClientFinding } from '@/lib/verification/findings'
+import { FootprintMapPreview } from '@/components/admin/FootprintMapPreview'
 
 interface VerificationItem {
   listing_id: string
@@ -347,14 +348,17 @@ export default function AdminVerificationsPage() {
     const propertyType = typeof listing.property_type === 'string' ? listing.property_type : null
     const cacRc = typeof listing.cac_rc_number === 'string' ? listing.cac_rc_number : null
 
-    const [footprintResult, setFootprintResult] = useState<{
+    interface FootprintResult {
       available: boolean
       buildings_inside_count: number
       total_footprint_area_m2: number
       polygon_area_m2: number | null
       coverage_ratio: number | null
       findings: ClientFinding[]
-    } | null>(null)
+      listing_polygon?: { type: 'Polygon'; coordinates: number[][][] } | null
+      building_footprints?: { type: 'FeatureCollection'; features: GeoJSON.Feature[] }
+    }
+    const [footprintResult, setFootprintResult] = useState<FootprintResult | null>(null)
     const [footprintLoading, setFootprintLoading] = useState(false)
     const [footprintErr, setFootprintErr] = useState<string | null>(null)
 
@@ -363,7 +367,9 @@ export default function AdminVerificationsPage() {
       setFootprintLoading(true)
       setFootprintErr(null)
       try {
-        const data = await be.get<typeof footprintResult>(`/listings/${listingId}/footprint-check`)
+        const data = await be.get<FootprintResult>(
+          `/listings/${listingId}/footprint-check?include_geometries=true`
+        )
         setFootprintResult(data)
       } catch (e) {
         const msg = (e as Error).message || 'Footprint check failed'
@@ -452,7 +458,7 @@ export default function AdminVerificationsPage() {
             ) : footprintErr ? (
               <p className="text-caption text-danger">{footprintErr}</p>
             ) : footprintResult ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-3 text-[11px]">
                   <div>
                     <p className="text-placeholder">Buildings inside</p>
@@ -476,6 +482,12 @@ export default function AdminVerificationsPage() {
                     <AutoFindingRow key={i} f={f} />
                   ))}
                 </ul>
+                <FootprintMapPreview
+                  listingPolygon={footprintResult.listing_polygon ?? null}
+                  buildingFootprints={footprintResult.building_footprints ?? null}
+                  latitude={lat}
+                  longitude={lng}
+                />
               </div>
             ) : (
               <p className="text-caption text-subtle">
