@@ -571,7 +571,7 @@ export default function AdminVerificationsPage() {
             }`}
           >
             <Crosshair size={14} />
-            Manual Check
+            Property Intelligence
           </button>
         </div>
       </div>

@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import type mapboxgl from 'mapbox-gl'
 import {
   ShieldCheck,
   MapPin,
@@ -83,34 +82,44 @@ export function ManualVerificationPanel() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markerRef = useRef<mapboxgl.Marker | null>(null)
+  const mbxRef = useRef<typeof import('mapbox-gl') | null>(null)
 
   // ── Initialize map ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainerRef.current) return
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
     if (!token) return
-    mapboxgl.accessToken = token
 
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [7.49, 9.06],
-      zoom: 11,
-      interactive: true,
-      attributionControl: false,
+    let cancelled = false
+
+    import('mapbox-gl').then((mbx) => {
+      if (cancelled || !mapContainerRef.current) return
+      mbxRef.current = mbx
+      mbx.default.accessToken = token
+
+      const map = new mbx.default.Map({
+        container: mapContainerRef.current,
+        style: 'mapbox://styles/mapbox/satellite-streets-v12',
+        center: [7.49, 9.06],
+        zoom: 11,
+        interactive: true,
+        attributionControl: false,
+      })
+
+      map.addControl(new mbx.default.NavigationControl({ showCompass: false }), 'top-right')
+      map.addControl(new mbx.default.AttributionControl({ compact: true }), 'bottom-right')
+      map.addControl(new mbx.default.ScaleControl({ maxWidth: 150 }), 'bottom-left')
+
+      mapRef.current = map
     })
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
-    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 150 }), 'bottom-left')
-
-    mapRef.current = map
     return () => {
+      cancelled = true
       markerRef.current?.remove()
-      map.remove()
+      mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Update map when lat/lng change ────────────────────────────────────────
   const updateMapMarker = useCallback(() => {
@@ -126,9 +135,11 @@ export function ManualVerificationPanel() {
     }
 
     if (!markerRef.current) {
+      const mbx = mbxRef.current
+      if (!mbx) return
       const el = document.createElement('div')
       el.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:#006aff;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`
-      markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lngN, latN]).addTo(map)
+      markerRef.current = new mbx.default.Marker({ element: el }).setLngLat([lngN, latN]).addTo(map)
     } else {
       markerRef.current.setLngLat([lngN, latN])
     }
@@ -176,9 +187,11 @@ export function ManualVerificationPanel() {
     // Fit bounds
     const coords = parsed.coordinates[0]
     if (coords?.length > 2) {
+      const mbx = mbxRef.current
+      if (!mbx) return
       const bounds = coords.reduce(
         (b, c) => b.extend(c as [number, number]),
-        new mapboxgl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]),
+        new mbx.default.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]),
       )
       map.fitBounds(bounds, { padding: 80, maxZoom: 19, duration: 800 })
     }
@@ -296,10 +309,10 @@ export function ManualVerificationPanel() {
         <div>
           <h2 className="text-h3 text-navy flex items-center gap-2">
             <Crosshair size={20} className="text-action" strokeWidth={1.8} />
-            Manual Verification
+            Property Intelligence
           </h2>
           <p className="text-body-sm text-subtle mt-1">
-            Enter plot details manually to run automated checks against satellite data.
+            Enter plot coordinates or boundary to analyse against satellite data and building records.
           </p>
         </div>
       </div>
@@ -424,7 +437,7 @@ export function ManualVerificationPanel() {
               </>
             ) : (
               <>
-                <ShieldCheck size={16} strokeWidth={2} /> Run Verification Checks
+                <ShieldCheck size={16} strokeWidth={2} /> Analyse Property
               </>
             )}
           </button>
