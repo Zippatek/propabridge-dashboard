@@ -668,6 +668,7 @@ interface ReviewFields {
   images: string[]
   plan_url: string | null
   plan_file_name: string | null
+  video_url: string
 }
 
 function ReviewStep({
@@ -728,6 +729,17 @@ function ReviewStep({
             onChange({ ...fields, plan_url: next.url, plan_file_name: next.fileName })
           }
         />
+
+        <label className="block">
+          <span className="text-caption text-subtle font-semibold mb-1.5 block">Property Video URL</span>
+          <input
+            className={inputCls}
+            value={fields.video_url}
+            onChange={e => onChange({ ...fields, video_url: e.target.value })}
+            placeholder="https://youtube.com/watch?v=..."
+            type="url"
+          />
+        </label>
 
         {/* Title */}
         <label className="block">
@@ -890,6 +902,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
     images: [],
     plan_url: null,
     plan_file_name: null,
+    video_url: '',
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -928,6 +941,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         images:        [],
         plan_url:      null,
         plan_file_name: null,
+        video_url:     '',
       })
       setStep('review')
     } catch (e) {
@@ -940,6 +954,11 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
     setSaving(true)
     setSaveError(null)
     try {
+      if (reviewFields.video_url && !reviewFields.video_url.startsWith('http')) {
+        setSaveError('Video URL must start with http or https.')
+        setSaving(false)
+        return
+      }
       const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
       const payload: Record<string, unknown> = {
         // headline
@@ -999,6 +1018,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         cover_image_url: reviewFields.images[0] || undefined,
         plan_url:       reviewFields.plan_url || undefined,
         plan_file_name: reviewFields.plan_file_name || undefined,
+        video_url:      reviewFields.video_url || undefined,
       }
 
       await be.send('/listings', 'POST', payload)

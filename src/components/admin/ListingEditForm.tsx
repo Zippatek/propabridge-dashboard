@@ -90,6 +90,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
     title_holder_name: listing.title_holder_name || '',
     title_issued_date: listing.title_issued_date || '',
     title_issuing_authority: listing.title_issuing_authority || '',
+    video_url: listing.video_url || '',
   })
   const [images, setImages] = useState<ImageItem[]>(initialImages)
   const [plan, setPlan] = useState<{ url: string | null; fileName: string | null }>({
@@ -124,6 +125,11 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
     setSaving(true)
     setErr(null)
     try {
+      if (form.video_url && !form.video_url.startsWith('http')) {
+        setErr('Video URL must start with http or https.')
+        setSaving(false)
+        return
+      }
       const payload: Record<string, unknown> = {
         title: form.title || undefined,
         description: form.description || undefined,
@@ -172,6 +178,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
         year_built: num(form.year_built as string),
         plan_url: plan.url,
         plan_file_name: plan.fileName,
+        video_url: form.video_url || null,
       }
       for (const k of Object.keys(payload)) {
         if (payload[k] === undefined || payload[k] === null) delete payload[k]
@@ -187,6 +194,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
         cover_image_url: (images.find(i => i.is_cover) || images[0])?.url ?? null,
         plan_url: plan.url,
         plan_file_name: plan.fileName,
+        video_url: form.video_url || null,
       })
     } catch (e) {
       setErr((e as Error).message)
@@ -231,6 +239,17 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
             onPlanPatch?.({ plan_url: next.url, plan_file_name: next.fileName })
           }}
         />
+
+        <label className="block">
+          <span className="text-caption text-subtle font-semibold mb-1.5 block">Property Video URL</span>
+          <input
+            className={inputCls}
+            value={form.video_url}
+            onChange={e => set('video_url', e.target.value)}
+            placeholder="https://youtube.com/watch?v=..."
+            type="url"
+          />
+        </label>
 
         <label className="block">
           <span className="text-caption text-subtle font-semibold mb-1.5 block">Title</span>

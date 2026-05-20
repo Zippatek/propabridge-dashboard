@@ -2,7 +2,20 @@
 const nextConfig = {
   output: 'standalone',
   images: {
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        port: '',
+        pathname: '/propabridge-production-bucket/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.propabridge.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
 }
 
