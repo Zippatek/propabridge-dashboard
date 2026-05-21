@@ -25,6 +25,7 @@ import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
 import { mergeParsedIntoAnswers, parseListingPasteFromText } from '@/lib/parse-listing-paste'
 import type { AiListingAnswers, AiListingResponse } from '@/app/api/admin/ai-listing/route'
 import { ListingPlanUpload } from '@/components/admin/ListingPlanUpload'
+import { NeighborhoodPicker } from '@/components/admin/NeighborhoodPicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -376,7 +377,14 @@ function QuestionsStep({
         <Fld label="Address line" value={answers.address_line || ''} onChange={v => set('address_line', v)} cls={inputCls} placeholder="Plot 585 Cadastral Zone B10, Dakibiyu" />
         <div className="grid grid-cols-2 gap-3">
           <Fld label="City" value={answers.city || ''} onChange={v => set('city', v)} cls={inputCls} placeholder="Abuja" />
-          <Fld label="Neighborhood" value={answers.neighborhood || ''} onChange={v => set('neighborhood', v)} cls={inputCls} placeholder="Wuse 2" />
+          <NeighborhoodPicker
+            value={answers.neighborhood || ''}
+            onChange={(name) => set('neighborhood', name)}
+            onCitySuggestion={(c) => { if (!answers.city?.trim()) set('city', c) }}
+            cityHint={answers.city || ''}
+            inputCls={inputCls}
+            placeholder="Search catalog (e.g. Apo, Wuse 2)"
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Fld label="Cadastral zone" value={answers.cadastral_zone || ''} onChange={v => set('cadastral_zone', v)} cls={inputCls} placeholder="B10" />
@@ -749,10 +757,13 @@ function ReviewStep({
 
         {/* Neighborhood + Address */}
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Neighborhood</span>
-            <input className={inputCls} value={fields.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="e.g. Wuse 2" />
-          </label>
+          <NeighborhoodPicker
+            value={fields.neighborhood}
+            onChange={(name) => set('neighborhood', name)}
+            onCitySuggestion={(c) => { if (!fields.city?.trim()) set('city', c) }}
+            cityHint={fields.city}
+            inputCls={inputCls}
+          />
           <label className="block">
             <span className="text-caption text-subtle font-semibold mb-1.5 block">Address</span>
             <input className={inputCls} value={fields.address} onChange={e => set('address', e.target.value)} placeholder="Street / plot" />

@@ -8,6 +8,7 @@ import { AdminListing } from '@/lib/types'
 import { ListingImageManager, ImageItem } from './ListingImageManager'
 import { ListingPlanUpload } from './ListingPlanUpload'
 import { TitleDocumentManager } from './TitleDocumentManager'
+import { NeighborhoodPicker } from './NeighborhoodPicker'
 
 interface ListingEditFormProps {
   listing: AdminListing
@@ -267,15 +268,13 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-caption text-subtle font-semibold mb-1.5 block">Neighborhood</span>
-            <input
-              className={inputCls}
-              value={form.neighborhood}
-              onChange={e => set('neighborhood', e.target.value)}
-              placeholder="e.g. Wuse 2"
-            />
-          </label>
+          <NeighborhoodPicker
+            value={form.neighborhood}
+            onChange={(name) => set('neighborhood', name)}
+            onCitySuggestion={(c) => { if (!form.city?.trim()) set('city', c) }}
+            cityHint={form.city}
+            inputCls={inputCls}
+          />
           <label className="block">
             <span className="text-caption text-subtle font-semibold mb-1.5 block">Address</span>
             <input

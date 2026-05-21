@@ -16,6 +16,7 @@
  */
 
 import { useState } from 'react'
+import { NeighborhoodPicker } from '@/components/admin/NeighborhoodPicker'
 import { useRouter } from 'next/navigation'
 import {
   Building2,
@@ -365,7 +366,14 @@ export function ListingWizard() {
             <Input label="Address" placeholder="Plot 585 Cadastral Zone B10, Dakibiyu" value={form.address_line} onChange={(e) => set('address_line', e.target.value)} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="City" value={form.city} onChange={(e) => set('city', e.target.value)} />
-              <Input label="Neighborhood" placeholder="Wuse 2" value={form.neighborhood} onChange={(e) => set('neighborhood', e.target.value)} />
+              <NeighborhoodPicker
+                value={form.neighborhood}
+                onChange={(name) => set('neighborhood', name)}
+                onCitySuggestion={(c) => { if (!form.city?.trim()) set('city', c) }}
+                cityHint={form.city}
+                inputCls="w-full px-3 py-2.5 rounded-input border border-divider bg-white text-body-sm text-navy placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-action"
+                placeholder="Search catalog (e.g. Apo)"
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Cadastral zone" placeholder="B10" value={form.cadastral_zone} onChange={(e) => set('cadastral_zone', e.target.value)} />
