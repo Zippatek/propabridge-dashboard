@@ -133,7 +133,12 @@ export function ManualVerificationPanel() {
       latN && lngN
         ? be.send<{ analysis: SatelliteAnalysis; findings: ClientFinding[] }>(
             '/admin/manual-satellite-analysis', 'POST',
-            { latitude: latN, longitude: lngN, property_type: propertyType || null }
+            {
+              latitude: latN,
+              longitude: lngN,
+              property_type: propertyType || null,
+              polygon_geojson: polygonJson.trim() || null,
+            }
           )
         : Promise.reject(new Error('No coordinates for satellite analysis')),
     ])
