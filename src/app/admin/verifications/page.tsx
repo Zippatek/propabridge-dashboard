@@ -119,8 +119,8 @@ export default function AdminVerificationsPage() {
     }
   }
 
-  const onResolveFinding = async (findingId: string, state: 'resolved' | 'waived' | 'acknowledged') => {
-    if (state === 'waived' && !waiveNote.trim()) {
+  const onResolveFinding = async (findingId: string, state: 'resolved' | 'waived' | 'acknowledged', note?: string) => {
+    if (state === 'waived' && !(note || '').trim()) {
       alert('A note is required when waiving a finding.')
       return
     }
@@ -128,7 +128,7 @@ export default function AdminVerificationsPage() {
     try {
       await be.send(`/admin/findings/${encodeURIComponent(findingId)}`, 'PATCH', {
         state,
-        note: state === 'waived' ? waiveNote : undefined,
+        note: state === 'waived' ? note : undefined,
       })
       if (selectedId) await loadDetail(selectedId)
       load()
@@ -305,7 +305,7 @@ export default function AdminVerificationsPage() {
                           variant="ghost"
                           onClick={() => {
                             const note = prompt('Waiver note (required):')
-                            if (note) { setWaiveNote(note); onResolveFinding(f.id, 'waived') }
+                            if (note) onResolveFinding(f.id, 'waived', note)
                           }}
                           disabled={resolvingId === f.id}
                         >
@@ -373,11 +373,19 @@ export default function AdminVerificationsPage() {
     interface SatelliteAnalysis {
       structures_visible: number
       estimated_plot_size: string
+      estimated_plot_area_sqm: number
       land_use: string
       construction_stage: string
+      roof_condition: string
       vegetation_coverage: string
       road_access: string
+      road_surface: string
       neighbouring_density: string
+      perimeter_security: string
+      terrain: string
+      flood_risk_indicators: string
+      infrastructure_quality: string
+      surrounding_context: string
       anomalies: string[]
       property_type_match: string
       confidence: number
@@ -571,25 +579,50 @@ export default function AdminVerificationsPage() {
                   {satResult.analysis.ai_summary}
                 </p>
                 {/* Stats grid */}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-[11px]">
                   {[
-                    ['Structures visible', satResult.analysis.structures_visible],
+                    ['Structures', satResult.analysis.structures_visible],
                     ['Plot size', satResult.analysis.estimated_plot_size],
-                    ['Land use', satResult.analysis.land_use],
+                    ['Est. area', satResult.analysis.estimated_plot_area_sqm ? `${satResult.analysis.estimated_plot_area_sqm} m²` : '—'],
+                    ['Land use', satResult.analysis.land_use?.replace(/_/g, ' ')],
                     ['Construction', satResult.analysis.construction_stage?.replace(/_/g, ' ')],
-                    ['Road access', satResult.analysis.road_access],
-                    ['Neighbour density', satResult.analysis.neighbouring_density],
+                    ['Roof', satResult.analysis.roof_condition],
+                    ['Road access', satResult.analysis.road_access?.replace(/_/g, ' ')],
+                    ['Road surface', satResult.analysis.road_surface?.replace(/_/g, ' ')],
+                    ['Density', satResult.analysis.neighbouring_density],
+                    ['Perimeter', satResult.analysis.perimeter_security?.replace(/_/g, ' ')],
+                    ['Terrain', satResult.analysis.terrain?.replace(/_/g, ' ')],
+                    ['Flood risk', satResult.analysis.flood_risk_indicators],
+                    ['Infrastructure', satResult.analysis.infrastructure_quality],
+                    ['Context', satResult.analysis.surrounding_context?.replace(/_/g, ' ')],
                     ['Vegetation', satResult.analysis.vegetation_coverage],
                     ['Type match', satResult.analysis.property_type_match],
                   ].map(([label, val]) => (
                     <div key={label as string}>
                       <span className="text-placeholder">{label}: </span>
                       <span className={`font-semibold ${
-                        val === 'mismatch' ? 'text-danger' :
-                        val === 'match' ? 'text-success' : 'text-navy'
+                        val === 'mismatch' || val === 'high' || val === 'none' ? 'text-danger' :
+                        val === 'match' || val === 'developed' || val === 'direct_paved' ? 'text-verified' : 'text-navy'
                       }`}>{String(val ?? '—')}</span>
                     </div>
                   ))}
+                </div>
+                {/* Confidence bar */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-placeholder whitespace-nowrap">AI Confidence</span>
+                  <div className="flex-1 h-1.5 bg-beige rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        satResult.analysis.confidence >= 0.7 ? 'bg-verified' :
+                        satResult.analysis.confidence >= 0.4 ? 'bg-warning' : 'bg-danger'
+                      }`}
+                      style={{ width: `${(satResult.analysis.confidence * 100).toFixed(0)}%` }}
+                    />
+                  </div>
+                  <span className={`text-[10px] font-bold ${
+                    satResult.analysis.confidence >= 0.7 ? 'text-verified' :
+                    satResult.analysis.confidence >= 0.4 ? 'text-warning' : 'text-danger'
+                  }`}>{(satResult.analysis.confidence * 100).toFixed(0)}%</span>
                 </div>
                 {/* Anomalies */}
                 {satResult.analysis.anomalies?.length > 0 && (
@@ -605,7 +638,7 @@ export default function AdminVerificationsPage() {
                   {satResult.findings.map((f, i) => <AutoFindingRow key={i} f={f} />)}
                 </ul>
                 <p className="text-[10px] text-placeholder">
-                  AI confidence: {(satResult.analysis.confidence * 100).toFixed(0)}% · Powered by Gemini Vision · Satellite © Google Maps Static API
+                  Powered by Gemini Vision · Satellite © Google Maps Static API
                 </p>
               </div>
             ) : (

@@ -80,6 +80,7 @@ export function ManualVerificationPanel() {
   interface SatelliteAnalysis {
     structures_visible: number; estimated_plot_size: string; land_use: string
     construction_stage: string; vegetation_coverage: string; road_access: string
+    road_quality?: string
     neighbouring_density: string; anomalies: string[]; property_type_match: string
     confidence: number; ai_summary: string
     // Reconciliation against the Open Buildings dataset
@@ -92,6 +93,9 @@ export function ManualVerificationPanel() {
     // Location intelligence-aware
     area_character?: string
     location_supports_listing?: string
+    // Street View
+    street_view_available?: boolean
+    street_view_observation?: string
   }
   interface LocationContext {
     formatted_address?: string | null
@@ -103,6 +107,7 @@ export function ManualVerificationPanel() {
   const [satAnalysis, setSatAnalysis] = useState<SatelliteAnalysis | null>(null)
   const [satFindings, setSatFindings] = useState<ClientFinding[]>([])
   const [satLocation, setSatLocation] = useState<LocationContext | null>(null)
+  const [satStreetViewAvailable, setSatStreetViewAvailable] = useState(false)
   const [satLoading, setSatLoading] = useState(false)
   const [satError, setSatError] = useState<string | null>(null)
 
@@ -142,7 +147,7 @@ export function ManualVerificationPanel() {
         property_type: propertyType || null,
       }),
       latN && lngN
-        ? be.send<{ analysis: SatelliteAnalysis; findings: ClientFinding[]; location?: LocationContext }>(
+        ? be.send<{ analysis: SatelliteAnalysis; findings: ClientFinding[]; location?: LocationContext; street_view_available?: boolean }>(
             '/admin/manual-satellite-analysis', 'POST',
             {
               latitude: latN,
@@ -168,6 +173,7 @@ export function ManualVerificationPanel() {
       setSatAnalysis(satResult.value.analysis)
       setSatFindings(satResult.value.findings)
       setSatLocation(satResult.value.location || null)
+      setSatStreetViewAvailable(satResult.value.street_view_available ?? false)
     } else {
       setSatError((satResult.reason as Error).message || 'Satellite analysis failed')
     }
@@ -501,6 +507,41 @@ export function ManualVerificationPanel() {
                     <p className="text-caption text-navy bg-action/5 border border-action/20 rounded px-3 py-2 leading-relaxed">
                       {satAnalysis.ai_summary}
                     </p>
+
+                    {/* Street View panel */}
+                    {lat && lng && (
+                      <div className="rounded border border-divider overflow-hidden">
+                        <div className="px-3 py-2 bg-beige/40 border-b border-divider flex items-center justify-between">
+                          <span className="text-[10px] font-semibold text-navy uppercase tracking-wide">Street View</span>
+                          {satStreetViewAvailable
+                            ? <span className="text-[9px] bg-verified-light text-verified px-1.5 py-0.5 rounded font-semibold">Available</span>
+                            : <span className="text-[9px] bg-beige text-placeholder px-1.5 py-0.5 rounded font-semibold">No imagery</span>
+                          }
+                        </div>
+                        {satStreetViewAvailable ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`/api/admin/street-view-proxy?lat=${lat}&lng=${lng}`}
+                              alt="Street View"
+                              className="w-full object-cover"
+                              style={{ maxHeight: 200 }}
+                            />
+                            {satAnalysis.street_view_observation && (
+                              <p className="px-3 py-2 text-[11px] text-navy bg-white">
+                                <span className="text-placeholder font-semibold">Ground view: </span>
+                                {satAnalysis.street_view_observation}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <div className="px-3 py-3 text-[11px] text-subtle">
+                            {satAnalysis.street_view_observation || 'No Google Street View imagery available at this location.'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
                       {([
                         ['Structures visible', satAnalysis.structures_visible],
@@ -508,6 +549,7 @@ export function ManualVerificationPanel() {
                         ['Land use', satAnalysis.land_use],
                         ['Construction', satAnalysis.construction_stage?.replace(/_/g, ' ')],
                         ['Road access', satAnalysis.road_access],
+                        ['Road quality', satAnalysis.road_quality ?? '—'],
                         ['Neighbour density', satAnalysis.neighbouring_density],
                         ['Vegetation', satAnalysis.vegetation_coverage],
                         ['Type match', satAnalysis.property_type_match],
