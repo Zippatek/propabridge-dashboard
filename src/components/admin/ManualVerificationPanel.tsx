@@ -14,8 +14,7 @@ import {
   FileText,
   ChevronDown,
   Loader2,
-  Copy,
-  Eye,
+  Brain,
 } from 'lucide-react'
 import { runGeoSanityChecks, parsePolygon, polygonAreaM2, polygonCentroid } from '@/lib/verification/geoChecks'
 import type { ClientFinding } from '@/lib/verification/findings'
@@ -78,6 +77,17 @@ export function ManualVerificationPanel() {
   const [footprintError, setFootprintError] = useState<string | null>(null)
   const [hasRun, setHasRun] = useState(false)
 
+  interface SatelliteAnalysis {
+    structures_visible: number; estimated_plot_size: string; land_use: string
+    construction_stage: string; vegetation_coverage: string; road_access: string
+    neighbouring_density: string; anomalies: string[]; property_type_match: string
+    confidence: number; ai_summary: string
+  }
+  const [satAnalysis, setSatAnalysis] = useState<SatelliteAnalysis | null>(null)
+  const [satFindings, setSatFindings] = useState<ClientFinding[]>([])
+  const [satLoading, setSatLoading] = useState(false)
+  const [satError, setSatError] = useState<string | null>(null)
+
   // Map state is handled by FootprintMapPreview now
 
 
@@ -85,54 +95,57 @@ export function ManualVerificationPanel() {
   const runChecks = async () => {
     setHasRun(true)
 
-    // Geo sanity checks (client-side, instant)
     const latN = lat.trim() ? parseFloat(lat) : null
     const lngN = lng.trim() ? parseFloat(lng) : null
+
+    // Geo sanity (client-side, instant)
     const geo = runGeoSanityChecks({
-      latitude: latN,
-      longitude: lngN,
+      latitude: latN, longitude: lngN,
       polygon_geojson: polygonJson.trim() || null,
       property_type: propertyType || null,
     })
     setGeoFindings(geo)
 
-    // Footprint check (server-side, needs polygon or coords)
     const polygon = parsePolygon(polygonJson)
     if (!polygon && latN == null) {
-      setFootprintError('Provide coordinates or a polygon to run building footprint check.')
+      setFootprintError('Provide coordinates or a polygon to run checks.')
       setFootprintResult(null)
       return
     }
 
-    setFootprintLoading(true)
-    setFootprintError(null)
-    setFootprintResult(null)
+    // Run footprint + satellite analysis in parallel
+    setFootprintLoading(true); setFootprintError(null); setFootprintResult(null)
+    setSatLoading(true); setSatError(null); setSatAnalysis(null); setSatFindings([])
 
-    try {
-      // Build a synthetic query — the backend footprint-check endpoint expects
-      // a listing ID, but we can also call it with raw coordinates via a
-      // dedicated manual-check proxy route. For now, we'll post to a Next.js
-      // API route that proxies to the backend.
-      const data = await be.send<FootprintResult>(
-        '/admin/manual-footprint-check',
-        'POST',
-        {
-          latitude: latN,
-          longitude: lngN,
-          polygon_geojson: polygonJson.trim() || null,
-          property_type: propertyType || null,
-        },
-      )
-      setFootprintResult(data)
-    } catch (e) {
-      const msg = (e as Error).message || 'Footprint check failed'
-      if (msg.includes('not yet loaded') || msg.includes('503') || msg.includes('not found')) {
-        setFootprintError('dataset_pending')
-      } else {
-        setFootprintError(msg)
-      }
-    } finally {
-      setFootprintLoading(false)
+    const [fpResult, satResult] = await Promise.allSettled([
+      be.send<FootprintResult>('/admin/manual-footprint-check', 'POST', {
+        latitude: latN, longitude: lngN,
+        polygon_geojson: polygonJson.trim() || null,
+        property_type: propertyType || null,
+      }),
+      latN && lngN
+        ? be.send<{ analysis: SatelliteAnalysis; findings: ClientFinding[] }>(
+            '/admin/manual-satellite-analysis', 'POST',
+            { latitude: latN, longitude: lngN, property_type: propertyType || null }
+          )
+        : Promise.reject(new Error('No coordinates for satellite analysis')),
+    ])
+
+    setFootprintLoading(false)
+    setSatLoading(false)
+
+    if (fpResult.status === 'fulfilled') {
+      setFootprintResult(fpResult.value)
+    } else {
+      const msg = (fpResult.reason as Error).message || 'Footprint check failed'
+      setFootprintError(msg.includes('503') || msg.includes('not yet loaded') ? 'dataset_pending' : msg)
+    }
+
+    if (satResult.status === 'fulfilled') {
+      setSatAnalysis(satResult.value.analysis)
+      setSatFindings(satResult.value.findings)
+    } else {
+      setSatError((satResult.reason as Error).message || 'Satellite analysis failed')
     }
   }
 
@@ -140,7 +153,7 @@ export function ManualVerificationPanel() {
   const parsed = parsePolygon(polygonJson)
   const polyArea = parsed ? polygonAreaM2(parsed) : null
   const polyCentroid = parsed ? polygonCentroid(parsed) : null
-  const allFindings = [...geoFindings, ...(footprintResult?.findings ?? [])]
+  const allFindings = [...geoFindings, ...(footprintResult?.findings ?? []), ...satFindings]
   const passCount = allFindings.filter(f => f.state === 'pass').length
   const failCount = allFindings.filter(f => f.state === 'fail').length
 
@@ -382,8 +395,8 @@ export function ManualVerificationPanel() {
               {/* Footprint section */}
               <div className="px-5 py-4">
                 <div className="flex items-center gap-1.5 mb-3">
-                  <Building2 size={13} className="text-subtle" />
-                  <span className="text-body-sm font-semibold text-navy">Building Footprint</span>
+                  <Layers size={13} className="text-subtle" />
+                  <span className="text-body-sm font-semibold text-navy">Satellite-Detected Structures</span>
                 </div>
                 {footprintError === 'dataset_pending' ? (
                   <div className="bg-beige/60 rounded p-3 text-caption text-subtle leading-relaxed">
@@ -402,7 +415,64 @@ export function ManualVerificationPanel() {
                 ) : footprintResult ? (
                   <p className="text-caption text-subtle">No footprint findings.</p>
                 ) : (
-                  <p className="text-caption text-subtle">Click "Run Verification Checks" to query building footprints.</p>
+                  <p className="text-caption text-subtle">Click <strong>Analyse Property</strong> to query satellite-detected building structures.</p>
+                )}
+              </div>
+
+              {/* AI Vision section */}
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Brain size={13} className="text-action" />
+                  <span className="text-body-sm font-semibold text-navy">AI Vision Analysis</span>
+                  <span className="ml-1 text-[10px] bg-action/10 text-action px-1.5 py-0.5 rounded-full font-semibold">Gemini</span>
+                </div>
+                {satLoading ? (
+                  <div className="flex items-center gap-2 text-caption text-subtle">
+                    <Loader2 size={12} className="animate-spin" /> Analysing satellite imagery…
+                  </div>
+                ) : satError ? (
+                  <p className="text-caption text-danger">{satError}</p>
+                ) : satAnalysis ? (
+                  <div className="space-y-3">
+                    <p className="text-caption text-navy bg-action/5 border border-action/20 rounded px-3 py-2 leading-relaxed">
+                      {satAnalysis.ai_summary}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                      {([
+                        ['Structures visible', satAnalysis.structures_visible],
+                        ['Plot size', satAnalysis.estimated_plot_size],
+                        ['Land use', satAnalysis.land_use],
+                        ['Construction', satAnalysis.construction_stage?.replace(/_/g, ' ')],
+                        ['Road access', satAnalysis.road_access],
+                        ['Neighbour density', satAnalysis.neighbouring_density],
+                        ['Vegetation', satAnalysis.vegetation_coverage],
+                        ['Type match', satAnalysis.property_type_match],
+                      ] as [string, string | number][]).map(([label, val]) => (
+                        <div key={label}>
+                          <span className="text-placeholder">{label}: </span>
+                          <span className={`font-semibold ${val === 'mismatch' ? 'text-danger' : val === 'match' ? 'text-verified' : 'text-navy'}`}>
+                            {String(val ?? '—')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {satAnalysis.anomalies?.length > 0 && (
+                      <div className="text-[11px] bg-warning/5 border border-warning/20 rounded px-3 py-2">
+                        <p className="font-semibold text-warning mb-1">Anomalies</p>
+                        <ul className="list-disc list-inside space-y-0.5 text-navy">
+                          {satAnalysis.anomalies.map((a, i) => <li key={i}>{a}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    <ul className="space-y-2">
+                      {satFindings.map((f, i) => <FindingRow key={i} f={f} />)}
+                    </ul>
+                    <p className="text-[10px] text-placeholder">
+                      Confidence: {(satAnalysis.confidence * 100).toFixed(0)}% · Gemini Vision · © Google Maps Static API
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-caption text-subtle">Satellite analysis runs automatically with Analyse Property.</p>
                 )}
               </div>
 
