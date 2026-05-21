@@ -18,6 +18,14 @@ COPY . .
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# NEXT_PUBLIC_* vars must be present at BUILD time — they are inlined into
+# the JS bundle by the Next.js compiler and are NOT available via runtime
+# environment variables. Pass them as Docker build args from cloudbuild.yaml.
+ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+ARG NEXT_PUBLIC_PROPA_BACKEND_BASE
+ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+ENV NEXT_PUBLIC_PROPA_BACKEND_BASE=$NEXT_PUBLIC_PROPA_BACKEND_BASE
+
 RUN npm run build
 
 # Production image, copy all the files and run next

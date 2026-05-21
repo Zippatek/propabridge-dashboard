@@ -27,18 +27,31 @@ export function ListingImageManager({
   const [enhanceStates, setEnhanceStates] = useState<EnhanceState[]>(() => initial.map(() => null))
   const dragIdx = useRef<number | null>(null)
 
+  const sanitizeForPersist = (imgs: ImageItem[]): ImageItem[] =>
+    imgs.filter((it) => {
+      const u = it.url?.trim() || ''
+      if (!u || u.startsWith('data:')) return false
+      if (u.length > 4096) return false
+      return true
+    })
+
   const persist = async (next: ImageItem[]) => {
+    const payload = sanitizeForPersist(next)
+    if (next.length > 0 && payload.length === 0) {
+      setErr('Images must be uploaded to storage first (paste/upload files, not raw image data).')
+      return
+    }
     setEnhanceStates(prev => {
       const padded = [...prev]
-      while (padded.length < next.length) padded.push(null)
-      return padded.slice(0, next.length)
+      while (padded.length < payload.length) padded.push(null)
+      return padded.slice(0, payload.length)
     })
-    setItems(next)
+    setItems(payload)
     setSaving(true)
     setErr(null)
     try {
-      await be.send(`/listings/${listingId}/images`, 'PUT', { images: next })
-      onPersisted(next)
+      await be.send(`/listings/${listingId}/images`, 'PUT', { images: payload })
+      onPersisted(payload)
     } catch (e) {
       setErr((e as Error).message)
     } finally {

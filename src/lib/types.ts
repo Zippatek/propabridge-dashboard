@@ -276,6 +276,7 @@ export interface AdminListing {
   plan_url?: string | null
   plan_file_name?: string | null
   video_url?: string | null
+  title_documents?: string[] | null
 }
 
 export interface AdkListing {

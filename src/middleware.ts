@@ -17,7 +17,20 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   res.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://propabridge-api-gateway-480235407496.us-central1.run.app; frame-ancestors 'none';",
+    [
+      "default-src 'self'",
+      // Google Maps JS API (required for satellite map on admin/verifications)
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      // Map tiles, satellite imagery, Street View panoramas, CDN assets
+      "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://storage.googleapis.com https://cdn.propabridge.com",
+      // API calls — backend, ADK, Google Maps APIs
+      "connect-src 'self' https://*.googleapis.com https://propabridge-api-gateway-480235407496.us-central1.run.app https://propabridge-adk-480235407496.us-central1.run.app",
+      "frame-src 'self' https://www.google.com",
+      "worker-src blob:",
+      "frame-ancestors 'none'",
+    ].join('; '),
   )
   res.headers.set(
     'Strict-Transport-Security',

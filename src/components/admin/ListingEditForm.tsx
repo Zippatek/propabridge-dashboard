@@ -7,6 +7,7 @@ import { LISTING_TYPES_DB, normalizeListingType } from '@/lib/listing-type'
 import { AdminListing } from '@/lib/types'
 import { ListingImageManager, ImageItem } from './ListingImageManager'
 import { ListingPlanUpload } from './ListingPlanUpload'
+import { TitleDocumentManager } from './TitleDocumentManager'
 
 interface ListingEditFormProps {
   listing: AdminListing
@@ -97,6 +98,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
     url: listing.plan_url ?? null,
     fileName: listing.plan_file_name ?? null,
   })
+  const [titleDocs, setTitleDocs] = useState<string[]>(listing.title_documents ?? [])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [propertyTypes, setPropertyTypes] = useState<string[]>(['apartment', 'house', 'duplex', 'bungalow', 'land', 'commercial', 'villa', 'penthouse'])
@@ -173,6 +175,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
         title_holder_name: form.title_holder_name || undefined,
         title_issued_date: form.title_issued_date || undefined,
         title_issuing_authority: form.title_issuing_authority || undefined,
+        title_documents: titleDocs.length > 0 ? titleDocs : undefined,
         amenities: form.amenities.split(',').map(s => s.trim()).filter(Boolean),
         units_available: num(form.units_available as string),
         year_built: num(form.year_built as string),
@@ -427,6 +430,18 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
                 onChange={e => set('title_issuing_authority', e.target.value)}
               />
             </label>
+            <TitleDocumentManager
+              listingId={listing.id}
+              initial={titleDocs}
+              onChange={setTitleDocs}
+              titleSnapshot={{
+                title_type: form.title_type,
+                title_file_no: form.title_file_no,
+                title_holder_name: form.title_holder_name,
+                title_issuing_authority: form.title_issuing_authority,
+                title_issued_date: form.title_issued_date,
+              }}
+            />
           </div>
         </details>
 

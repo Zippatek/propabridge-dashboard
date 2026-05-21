@@ -11,14 +11,26 @@ import {
   XCircle,
   RefreshCw,
   ChevronRight,
-  X,
   ArrowLeft,
+  MapPin,
+  Building2,
+  FileSearch,
+  Crosshair,
+  Satellite,
+  Brain,
+  Layers,
 } from 'lucide-react'
 import { be } from '@/lib/client-api'
 import { formatDateTime } from '@/lib/format'
 import { PageLoading, PageError } from '@/components/admin/AsyncBoundary'
 import { Button } from '@/components/ui/Button'
 import { StatCard } from '@/components/ui/StatCard'
+import { runGeoSanityChecks } from '@/lib/verification/geoChecks'
+import type { ClientFinding } from '@/lib/verification/findings'
+import { FootprintMapPreview } from '@/components/admin/FootprintMapPreview'
+import { ManualVerificationPanel } from '@/components/admin/ManualVerificationPanel'
+
+type ViewMode = 'queue' | 'manual'
 
 interface VerificationItem {
   listing_id: string
@@ -66,6 +78,7 @@ const STATUS_TABS: { label: string; value: StatusFilter | 'pending'; color: stri
 ]
 
 export default function AdminVerificationsPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('queue')
   const [items, setItems] = useState<VerificationItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -307,6 +320,9 @@ export default function AdminVerificationsPage() {
           )}
         </section>
 
+        {/* Automated checks */}
+        <AutomatedChecksCard listing={detail.listing} />
+
         {/* Verification record */}
         {detail.verification && (
           <section className="bg-white rounded-card border border-divider shadow-card p-6">
@@ -331,13 +347,355 @@ export default function AdminVerificationsPage() {
 
   if (selectedId && detailLoading) return <PageLoading />
 
+  // ── Automated checks helper components ───────────────────────────────────
+  function AutomatedChecksCard({ listing }: { listing: Record<string, unknown> }) {
+    const listingId = typeof listing.id === 'string' ? listing.id : null
+    const lat = typeof listing.latitude === 'number' ? listing.latitude : null
+    const lng = typeof listing.longitude === 'number' ? listing.longitude : null
+    const polygon = typeof listing.polygon_geojson === 'string' ? listing.polygon_geojson : null
+    const propertyType = typeof listing.property_type === 'string' ? listing.property_type : null
+    const cacRc = typeof listing.cac_rc_number === 'string' ? listing.cac_rc_number : null
+
+    interface FootprintResult {
+      available: boolean
+      buildings_inside_count: number
+      total_footprint_area_m2: number
+      polygon_area_m2: number | null
+      coverage_ratio: number | null
+      findings: ClientFinding[]
+      listing_polygon?: { type: 'Polygon'; coordinates: number[][][] } | null
+      building_footprints?: { type: 'FeatureCollection'; features: GeoJSON.Feature[] }
+    }
+    const [footprintResult, setFootprintResult] = useState<FootprintResult | null>(null)
+    const [footprintLoading, setFootprintLoading] = useState(false)
+    const [footprintErr, setFootprintErr] = useState<string | null>(null)
+
+    interface SatelliteAnalysis {
+      structures_visible: number
+      estimated_plot_size: string
+      land_use: string
+      construction_stage: string
+      vegetation_coverage: string
+      road_access: string
+      neighbouring_density: string
+      anomalies: string[]
+      property_type_match: string
+      confidence: number
+      ai_summary: string
+    }
+    interface SatelliteResult { analysis: SatelliteAnalysis; findings: ClientFinding[]; center: { lat: number; lng: number } }
+    const [satResult, setSatResult] = useState<SatelliteResult | null>(null)
+    const [satLoading, setSatLoading] = useState(false)
+    const [satErr, setSatErr] = useState<string | null>(null)
+
+    const runFootprintCheck = async () => {
+      if (!listingId) return
+      setFootprintLoading(true)
+      setFootprintErr(null)
+      try {
+        const data = await be.get<FootprintResult>(
+          `/listings/${listingId}/footprint-check?include_geometries=true`
+        )
+        setFootprintResult(data)
+      } catch (e) {
+        const msg = (e as Error).message || 'Footprint check failed'
+        if (msg.includes('not yet loaded') || msg.includes('503')) {
+          setFootprintErr('dataset_pending')
+        } else {
+          setFootprintErr(msg)
+        }
+      } finally {
+        setFootprintLoading(false)
+      }
+    }
+
+    const runSatelliteAnalysis = async () => {
+      if (!listingId) return
+      setSatLoading(true)
+      setSatErr(null)
+      try {
+        const res = await fetch(`/api/admin/satellite-analysis?listing_id=${listingId}`)
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Analysis failed')
+        setSatResult(data as SatelliteResult)
+      } catch (e) {
+        setSatErr((e as Error).message)
+      } finally {
+        setSatLoading(false)
+      }
+    }
+
+    const geoFindings: ClientFinding[] = runGeoSanityChecks({
+      latitude: lat,
+      longitude: lng,
+      polygon_geojson: polygon,
+      property_type: propertyType,
+    })
+
+    const allFindings = [
+      ...geoFindings,
+      ...(footprintResult?.findings ?? []),
+      ...(satResult?.findings ?? []),
+    ]
+    const passCount = allFindings.filter(f => f.state === 'pass').length
+    const failCount = allFindings.filter(f => f.state === 'fail').length
+    const hasCoords = lat != null && lng != null
+
+    return (
+      <section className="bg-white rounded-card border border-divider shadow-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-divider flex items-center gap-2">
+          <ShieldCheck size={16} className="text-action" />
+          <h2 className="text-h4 text-navy">Automated Checks</h2>
+          <span className="ml-auto text-caption text-subtle">
+            {passCount} pass · {failCount} fail
+          </span>
+        </div>
+        <div className="divide-y divide-divider">
+
+          {/* Geo sanity */}
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <MapPin size={13} className="text-subtle" />
+              <span className="text-body-sm font-semibold text-navy">Geo Sanity</span>
+              {!hasCoords && (
+                <span className="ml-2 text-caption text-placeholder">No coordinates on listing</span>
+              )}
+            </div>
+            {geoFindings.length === 0 ? (
+              <p className="text-caption text-subtle">No geo data to check.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {geoFindings.map((f, i) => (
+                  <AutoFindingRow key={i} f={f} />
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Satellite-detected structures (Google Open Buildings v3) */}
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Layers size={13} className="text-subtle" />
+              <span className="text-body-sm font-semibold text-navy">Satellite-Detected Structures</span>
+              <span className="ml-auto">
+                <button
+                  type="button"
+                  onClick={runFootprintCheck}
+                  disabled={footprintLoading || !listingId}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded text-caption font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
+                >
+                  {footprintLoading ? (
+                    <><RefreshCw size={10} className="animate-spin" /> Checking…</>
+                  ) : (
+                    <><Building2 size={10} /> Run check</>
+                  )}
+                </button>
+              </span>
+            </div>
+            {footprintErr === 'dataset_pending' ? (
+              <p className="text-caption text-subtle leading-relaxed">
+                The Google Open Buildings v3 dataset for FCT is not yet loaded into the database.
+                Run <code className="text-[11px] bg-beige px-1 rounded">python scripts/export_open_buildings.py</code>{' '}
+                then <code className="text-[11px] bg-beige px-1 rounded">bash scripts/load_footprints.sh</code> to populate it.
+              </p>
+            ) : footprintErr ? (
+              <p className="text-caption text-danger">{footprintErr}</p>
+            ) : footprintResult ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-3 text-[11px]">
+                  <div>
+                    <p className="text-placeholder">Buildings inside</p>
+                    <p className="font-semibold text-navy">{footprintResult.buildings_inside_count}</p>
+                  </div>
+                  <div>
+                    <p className="text-placeholder">Footprint area</p>
+                    <p className="font-semibold text-navy">{footprintResult.total_footprint_area_m2.toFixed(0)} m²</p>
+                  </div>
+                  <div>
+                    <p className="text-placeholder">Coverage</p>
+                    <p className="font-semibold text-navy">
+                      {footprintResult.coverage_ratio != null
+                        ? `${(footprintResult.coverage_ratio * 100).toFixed(1)}%`
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+                <ul className="space-y-1.5">
+                  {footprintResult.findings.map((f, i) => (
+                    <AutoFindingRow key={i} f={f} />
+                  ))}
+                </ul>
+                <div className="w-full relative rounded border border-divider overflow-hidden" style={{ height: 340 }}>
+                  <FootprintMapPreview
+                    listingPolygon={footprintResult.listing_polygon ?? null}
+                    buildingFootprints={footprintResult.building_footprints ?? null}
+                    latitude={lat}
+                    longitude={lng}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-caption text-subtle">
+                Click <strong>Run check</strong> to cross-check this listing&apos;s location against satellite-detected building structures for Abuja.
+              </p>
+            )}
+          </div>
+
+          {/* AI Vision Satellite Analysis */}
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Brain size={13} className="text-action" />
+              <span className="text-body-sm font-semibold text-navy">AI Vision Analysis</span>
+              <span className="ml-1 text-[10px] bg-action/10 text-action px-1.5 py-0.5 rounded-full font-semibold">Gemini</span>
+              <span className="ml-auto">
+                <button
+                  type="button"
+                  onClick={runSatelliteAnalysis}
+                  disabled={satLoading || !listingId}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded text-caption font-semibold bg-beige border border-divider text-subtle hover:text-action hover:border-action transition-colors disabled:opacity-50"
+                >
+                  {satLoading ? (
+                    <><RefreshCw size={10} className="animate-spin" /> Analysing…</>
+                  ) : (
+                    <><Brain size={10} /> Analyse</>
+                  )}
+                </button>
+              </span>
+            </div>
+            {satErr ? (
+              <p className="text-caption text-danger">{satErr}</p>
+            ) : satResult ? (
+              <div className="space-y-3">
+                {/* AI summary */}
+                <p className="text-caption text-navy bg-action/5 border border-action/20 rounded px-3 py-2 leading-relaxed">
+                  {satResult.analysis.ai_summary}
+                </p>
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                  {[
+                    ['Structures visible', satResult.analysis.structures_visible],
+                    ['Plot size', satResult.analysis.estimated_plot_size],
+                    ['Land use', satResult.analysis.land_use],
+                    ['Construction', satResult.analysis.construction_stage?.replace(/_/g, ' ')],
+                    ['Road access', satResult.analysis.road_access],
+                    ['Neighbour density', satResult.analysis.neighbouring_density],
+                    ['Vegetation', satResult.analysis.vegetation_coverage],
+                    ['Type match', satResult.analysis.property_type_match],
+                  ].map(([label, val]) => (
+                    <div key={label as string}>
+                      <span className="text-placeholder">{label}: </span>
+                      <span className={`font-semibold ${
+                        val === 'mismatch' ? 'text-danger' :
+                        val === 'match' ? 'text-success' : 'text-navy'
+                      }`}>{String(val ?? '—')}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Anomalies */}
+                {satResult.analysis.anomalies?.length > 0 && (
+                  <div className="text-[11px] bg-warning/5 border border-warning/20 rounded px-3 py-2">
+                    <p className="font-semibold text-warning mb-1">Anomalies detected</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-navy">
+                      {satResult.analysis.anomalies.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {/* Findings */}
+                <ul className="space-y-1.5">
+                  {satResult.findings.map((f, i) => <AutoFindingRow key={i} f={f} />)}
+                </ul>
+                <p className="text-[10px] text-placeholder">
+                  AI confidence: {(satResult.analysis.confidence * 100).toFixed(0)}% · Powered by Gemini Vision · Satellite © Google Maps Static API
+                </p>
+              </div>
+            ) : (
+              <p className="text-caption text-subtle">
+                Click <strong>Analyse</strong> to run Gemini Vision on the satellite image of this property — checks construction stage, land use, building count, and flags anomalies.
+              </p>
+            )}
+          </div>
+
+          {/* CAC quick-verify */}
+          {cacRc && (
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <FileSearch size={13} className="text-subtle" />
+                <span className="text-body-sm font-semibold text-navy">CAC Registration</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="text-caption text-subtle">RC #{cacRc}</p>
+                <a
+                  href="https://search.cac.gov.ng/home"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-caption font-semibold bg-beige border border-divider text-navy hover:text-action hover:border-action transition-colors"
+                >
+                  <FileSearch size={11} /> Verify on CAC
+                </a>
+                <span className="text-[10px] text-placeholder">Search for RC #{cacRc}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  function AutoFindingRow({ f }: { f: ClientFinding }) {
+    const icon = f.state === 'pass'
+      ? <CheckCircle2 size={13} className="text-verified flex-shrink-0 mt-0.5" />
+      : f.severity === 'block'
+        ? <XCircle size={13} className="text-danger flex-shrink-0 mt-0.5" />
+        : <AlertTriangle size={13} className="text-warning flex-shrink-0 mt-0.5" />
+    return (
+      <li className="flex items-start gap-2">
+        {icon}
+        <span className="text-body-sm text-navy">{f.message}</span>
+      </li>
+    )
+  }
+
   // ── List view ────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h3 text-navy">Verification Queue</h1>
-        <p className="text-body-sm text-subtle mt-1">Review and verify property listings</p>
+      {/* ── Top-level mode toggle ────────────────────────────────────────── */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-h3 text-navy">Verification</h1>
+          <p className="text-body-sm text-subtle mt-1">Review listings or run ad-hoc checks</p>
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-divider shadow-sm">
+          <button
+            onClick={() => setViewMode('queue')}
+            className={`px-4 py-2 text-body-sm font-semibold transition-all duration-150 flex items-center gap-2 ${
+              viewMode === 'queue'
+                ? 'bg-action text-white'
+                : 'bg-white text-subtle hover:bg-beige hover:text-navy'
+            }`}
+          >
+            <ClipboardCheck size={14} />
+            Queue
+          </button>
+          <button
+            onClick={() => setViewMode('manual')}
+            className={`px-4 py-2 text-body-sm font-semibold transition-all duration-150 flex items-center gap-2 border-l border-divider ${
+              viewMode === 'manual'
+                ? 'bg-action text-white'
+                : 'bg-white text-subtle hover:bg-beige hover:text-navy'
+            }`}
+          >
+            <Crosshair size={14} />
+            Property Intelligence
+          </button>
+        </div>
       </div>
+
+      {/* ── Manual verification mode ─────────────────────────────────────── */}
+      {viewMode === 'manual' ? (
+        <ManualVerificationPanel />
+      ) : (
+      /* ── Queue mode (existing content) ───────────────────────────────── */
+      <>
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -439,6 +797,7 @@ export default function AdminVerificationsPage() {
           </div>
         )}
       </section>
+    </>)}
     </div>
   )
 }

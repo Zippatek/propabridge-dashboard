@@ -1,12 +1,25 @@
-# Set `_GEMINI_API_KEY` on the Cloud Build trigger (or pass --substitutions on submit)
-# so Cloud Run receives the same key as api-gateway (`GEMINI_API_KEY` there).
+# Substitution variables — set these on the Cloud Build trigger in GCP Console:
+#   _GEMINI_API_KEY                  → Gemini API key
+#   _NEXT_PUBLIC_GOOGLE_MAPS_API_KEY → Google Maps JS API key (baked into bundle at build time)
+#   _NEXT_PUBLIC_PROPA_BACKEND_BASE  → backend URL (baked into bundle at build time)
 substitutions:
   _GEMINI_API_KEY: ''
+  _NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ''
+  _NEXT_PUBLIC_PROPA_BACKEND_BASE: 'https://propabridge-api-gateway-480235407496.us-central1.run.app'
 
 steps:
-  # Build the container image
+  # Build the container image — NEXT_PUBLIC_* vars must be passed as build args
+  # so Next.js inlines them into the JS bundle at compile time.
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/propabridge-dashboard/propabridge-dashboard:$COMMIT_SHA', '.']
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/propabridge-dashboard/propabridge-dashboard:$COMMIT_SHA'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_PROPA_BACKEND_BASE=$_NEXT_PUBLIC_PROPA_BACKEND_BASE'
+      - '.'
   
   # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
