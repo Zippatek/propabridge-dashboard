@@ -89,9 +89,20 @@ export function ManualVerificationPanel() {
     footprints_no_building?: number
     buildings_missed_by_dataset?: number
     dataset_accuracy?: string
+    // Location intelligence-aware
+    area_character?: string
+    location_supports_listing?: string
+  }
+  interface LocationContext {
+    formatted_address?: string | null
+    neighborhood?: string | null
+    district?: string | null
+    route?: string | null
+    nearby_landmarks?: { name: string; types?: string[]; vicinity?: string }[]
   }
   const [satAnalysis, setSatAnalysis] = useState<SatelliteAnalysis | null>(null)
   const [satFindings, setSatFindings] = useState<ClientFinding[]>([])
+  const [satLocation, setSatLocation] = useState<LocationContext | null>(null)
   const [satLoading, setSatLoading] = useState(false)
   const [satError, setSatError] = useState<string | null>(null)
 
@@ -131,7 +142,7 @@ export function ManualVerificationPanel() {
         property_type: propertyType || null,
       }),
       latN && lngN
-        ? be.send<{ analysis: SatelliteAnalysis; findings: ClientFinding[] }>(
+        ? be.send<{ analysis: SatelliteAnalysis; findings: ClientFinding[]; location?: LocationContext }>(
             '/admin/manual-satellite-analysis', 'POST',
             {
               latitude: latN,
@@ -156,6 +167,7 @@ export function ManualVerificationPanel() {
     if (satResult.status === 'fulfilled') {
       setSatAnalysis(satResult.value.analysis)
       setSatFindings(satResult.value.findings)
+      setSatLocation(satResult.value.location || null)
     } else {
       setSatError((satResult.reason as Error).message || 'Satellite analysis failed')
     }
@@ -446,6 +458,46 @@ export function ManualVerificationPanel() {
                   <p className="text-caption text-danger">{satError}</p>
                 ) : satAnalysis ? (
                   <div className="space-y-3">
+                    {/* Location intelligence (Google Places) */}
+                    {(satLocation?.formatted_address || satLocation?.neighborhood || (satLocation?.nearby_landmarks ?? []).length > 0) && (
+                      <div className="text-[11px] bg-action/5 border border-action/20 rounded px-3 py-2 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-action">Location intelligence</p>
+                          {satAnalysis.location_supports_listing && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                              satAnalysis.location_supports_listing === 'yes' ? 'bg-verified-light text-verified' :
+                              satAnalysis.location_supports_listing === 'no' ? 'bg-danger-light text-danger' :
+                              'bg-warning-light text-warning'
+                            }`}>
+                              Location supports listing: {satAnalysis.location_supports_listing}
+                            </span>
+                          )}
+                        </div>
+                        {satLocation?.formatted_address && (
+                          <p className="text-navy"><span className="text-placeholder">Address: </span>{satLocation.formatted_address}</p>
+                        )}
+                        <div className="flex flex-wrap gap-x-3 text-navy">
+                          {satLocation?.neighborhood && <span><span className="text-placeholder">Area: </span>{satLocation.neighborhood}</span>}
+                          {satLocation?.district && <span><span className="text-placeholder">District: </span>{satLocation.district}</span>}
+                          {satLocation?.route && <span><span className="text-placeholder">Street: </span>{satLocation.route}</span>}
+                        </div>
+                        {satAnalysis.area_character && (
+                          <p className="text-navy"><span className="text-placeholder">Area character: </span><span className="font-semibold">{satAnalysis.area_character}</span></p>
+                        )}
+                        {(satLocation?.nearby_landmarks ?? []).length > 0 && (
+                          <div className="mt-1">
+                            <p className="text-placeholder mb-0.5">Nearby (Google Places):</p>
+                            <div className="flex flex-wrap gap-1">
+                              {(satLocation?.nearby_landmarks ?? []).slice(0, 6).map((p, i) => (
+                                <span key={i} className="bg-white border border-divider rounded px-1.5 py-0.5 text-[10px]">
+                                  {p.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <p className="text-caption text-navy bg-action/5 border border-action/20 rounded px-3 py-2 leading-relaxed">
                       {satAnalysis.ai_summary}
                     </p>
