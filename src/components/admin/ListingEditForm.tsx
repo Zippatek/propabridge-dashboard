@@ -127,10 +127,18 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
     setSaving(true)
     setErr(null)
     try {
-      if (form.video_url && !form.video_url.startsWith('http')) {
-        setErr('Video URL must start with http or https.')
-        setSaving(false)
-        return
+      const videoUrlClean = form.video_url?.trim() || ''
+      if (videoUrlClean) {
+        try {
+          const parsed = new URL(videoUrlClean)
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            throw new Error()
+          }
+        } catch {
+          setErr('Video URL must be a valid URL starting with http:// or https://')
+          setSaving(false)
+          return
+        }
       }
       const payload: Record<string, unknown> = {
         title: form.title || undefined,
@@ -181,10 +189,10 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
         year_built: num(form.year_built as string),
         plan_url: plan.url,
         plan_file_name: plan.fileName,
-        video_url: form.video_url || null,
+        video_url: videoUrlClean || null,
       }
       for (const k of Object.keys(payload)) {
-        if (payload[k] === undefined || payload[k] === null) delete payload[k]
+        if (payload[k] === undefined || (payload[k] === null && k !== 'video_url')) delete payload[k]
       }
       const res = await be.send<any>(`/listings/${listing.id}`, 'PATCH', payload)
       const updatedData = res?.data || res?.item || res || {}
@@ -197,7 +205,7 @@ export function ListingEditForm({ listing, onSaved, onCancel, onPlanPatch }: Lis
         cover_image_url: (images.find(i => i.is_cover) || images[0])?.url ?? null,
         plan_url: plan.url,
         plan_file_name: plan.fileName,
-        video_url: form.video_url || null,
+        video_url: videoUrlClean || null,
       })
     } catch (e) {
       setErr((e as Error).message)

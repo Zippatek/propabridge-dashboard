@@ -18,6 +18,7 @@ import { be } from '@/lib/client-api'
 import { PageError } from '@/components/admin/AsyncBoundary'
 
 interface Issue {
+  id?: string
   field: string
   severity: 'low' | 'medium' | 'high'
   message: string
@@ -169,10 +170,6 @@ export default function AdminAuditPage() {
   useEffect(() => {
     if (preview) setAutofixContextModal(preview.user_context || '')
   }, [preview])
-
-  function issueRef(findingHash: string) {
-    return findingHash
-  }
 
   const normalizeListingTypeUi = (raw: string | null | undefined): string => {
     const s = String(raw || '').toLowerCase()
@@ -688,11 +685,11 @@ export default function AdminAuditPage() {
                               type="button"
                               disabled={!!autofixLoading}
                               onClick={() =>
-                                dryRunAutofix(r.property_id, r.id, [issueRef(issue.id)])
+                                dryRunAutofix(r.property_id, r.id, [issue.id || ''])
                               }
                               className="text-[10px] font-semibold uppercase tracking-wide text-action hover:underline disabled:opacity-50"
                             >
-                              {autofixLoading === `${r.property_id}:${issueRef(r.id, idx)}` ? (
+                              {autofixLoading === `${r.property_id}:${issue.id}` ? (
                                 <Loader2 size={10} className="inline animate-spin" />
                               ) : null}{' '}
                               Auto-fix this

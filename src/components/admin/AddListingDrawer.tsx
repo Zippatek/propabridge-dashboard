@@ -954,10 +954,18 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
     setSaving(true)
     setSaveError(null)
     try {
-      if (reviewFields.video_url && !reviewFields.video_url.startsWith('http')) {
-        setSaveError('Video URL must start with http or https.')
-        setSaving(false)
-        return
+      const videoUrlClean = reviewFields.video_url?.trim() || ''
+      if (videoUrlClean) {
+        try {
+          const parsed = new URL(videoUrlClean)
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            throw new Error()
+          }
+        } catch {
+          setSaveError('Video URL must be a valid URL starting with http:// or https://')
+          setSaving(false)
+          return
+        }
       }
       const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
       const payload: Record<string, unknown> = {
@@ -1018,7 +1026,7 @@ export default function AddListingDrawer({ onClose, onCreated }: AddListingDrawe
         cover_image_url: reviewFields.images[0] || undefined,
         plan_url:       reviewFields.plan_url || undefined,
         plan_file_name: reviewFields.plan_file_name || undefined,
-        video_url:      reviewFields.video_url || undefined,
+        video_url:      videoUrlClean || undefined,
       }
 
       await be.send('/listings', 'POST', payload)
