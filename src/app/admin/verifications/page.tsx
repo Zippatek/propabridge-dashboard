@@ -480,7 +480,7 @@ export default function AdminVerificationsPage() {
             )}
           </div>
 
-          {/* Satellite-detected structures (Google Open Buildings v3) */}
+          {/* Satellite-detected structures (multi-source) */}
           <div className="px-6 py-4">
             <div className="flex items-center gap-1.5 mb-3">
               <Layers size={13} className="text-subtle" />
@@ -502,7 +502,7 @@ export default function AdminVerificationsPage() {
             </div>
             {footprintErr === 'dataset_pending' ? (
               <p className="text-caption text-subtle leading-relaxed">
-                The Google Open Buildings v3 dataset for FCT is not yet loaded into the database.
+                The historical building dataset is not yet loaded — live satellite analysis and OSM data remain available.
                 Run <code className="text-[11px] bg-beige px-1 rounded">python scripts/export_open_buildings.py</code>{' '}
                 then <code className="text-[11px] bg-beige px-1 rounded">bash scripts/load_footprints.sh</code> to populate it.
               </p>

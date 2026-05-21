@@ -83,13 +83,14 @@ export function ManualVerificationPanel() {
     road_quality?: string
     neighbouring_density: string; anomalies: string[]; property_type_match: string
     confidence: number; ai_summary: string
-    // Reconciliation against the Open Buildings dataset
+    // Multi-source reconciliation
     footprints_overlaid?: number
     footprints_correctly_aligned?: number
     footprints_misaligned?: number
     footprints_no_building?: number
-    buildings_missed_by_dataset?: number
+    buildings_confirmed_live_only?: number
     dataset_accuracy?: string
+    data_sources_summary?: string
     // Location intelligence-aware
     area_character?: string
     location_supports_listing?: string
@@ -432,7 +433,7 @@ export function ManualVerificationPanel() {
                   <div className="bg-beige/60 rounded p-3 text-caption text-subtle leading-relaxed">
                     <p className="font-semibold text-navy mb-1">Building footprint dataset not loaded</p>
                     <p>
-                      The Google Open Buildings v3 dataset for FCT is not yet loaded into the database.
+                      Historical building dataset is not yet loaded — live satellite analysis and OSM data remain available.
                       Run <code className="text-[11px] bg-beige px-1 rounded">python scripts/load_abuja_buildings.py</code> to populate it.
                     </p>
                   </div>
@@ -565,7 +566,7 @@ export function ManualVerificationPanel() {
                     {satAnalysis.footprints_overlaid != null && satAnalysis.footprints_overlaid > 0 && (
                       <div className="text-[11px] bg-beige/60 border border-divider rounded px-3 py-2 space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <p className="font-semibold text-navy">Dataset reconciliation</p>
+                          <p className="font-semibold text-navy">Data Source Verification</p>
                           {satAnalysis.dataset_accuracy && (
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
                               satAnalysis.dataset_accuracy === 'high' ? 'bg-verified-light text-verified' :
@@ -581,8 +582,9 @@ export function ManualVerificationPanel() {
                           <div><span className="text-placeholder">Correct: </span><span className="font-semibold text-verified">{satAnalysis.footprints_correctly_aligned ?? '—'}</span></div>
                           <div><span className="text-placeholder">Misaligned: </span><span className="font-semibold text-warning">{satAnalysis.footprints_misaligned ?? '—'}</span></div>
                           <div><span className="text-placeholder">On open ground: </span><span className="font-semibold text-danger">{satAnalysis.footprints_no_building ?? '—'}</span></div>
-                          <div className="col-span-2"><span className="text-placeholder">Buildings missed by dataset: </span><span className="font-semibold text-action">{satAnalysis.buildings_missed_by_dataset ?? '—'}</span></div>
+                          <div className="col-span-2"><span className="text-placeholder">Confirmed by live satellite only: </span><span className="font-semibold text-verified">{satAnalysis.buildings_confirmed_live_only ?? '—'}</span></div>
                         </div>
+                        <p className="text-[9px] text-placeholder mt-1">Sources: Google Open Buildings (2023 snapshot) · OpenStreetMap (live) · Gemini Vision (live satellite)</p>
                       </div>
                     )}
                     {satAnalysis.anomalies?.length > 0 && (

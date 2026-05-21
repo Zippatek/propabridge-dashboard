@@ -93,6 +93,23 @@ function DataLayers({
         }
       }
       if (feature.getProperty('isBuilding')) {
+        const source = feature.getProperty('source') as string
+        if (source === 'osm') {
+          return {
+            fillColor: '#06b6d4',
+            fillOpacity: 0.35,
+            strokeColor: '#06b6d4',
+            strokeWeight: 1.5,
+          }
+        }
+        if (source === 'both') {
+          return {
+            fillColor: '#22c55e',
+            fillOpacity: 0.40,
+            strokeColor: '#22c55e',
+            strokeWeight: 2,
+          }
+        }
         return {
           fillColor: '#f97316',
           fillOpacity: 0.35,
@@ -111,14 +128,26 @@ function DataLayers({
 
     map.data.addListener('mouseover', (e: google.maps.Data.MouseEvent) => {
       if (e.feature.getProperty('isBuilding')) {
+        const source = e.feature.getProperty('source') as string
         const confidence = (Number(e.feature.getProperty('confidence') || 0) * 100).toFixed(0)
         const area = Number(e.feature.getProperty('area_in_meters') || 0).toFixed(0)
-        
+
+        let label = 'Google Building'
+        let extra = `Confidence: ${confidence}%<br>Area: ${area} m²`
+        if (source === 'osm') {
+          const bType = e.feature.getProperty('building_type') as string
+          const levels = e.feature.getProperty('levels') as string
+          label = 'OSM Building'
+          extra = (bType ? `Type: ${bType}<br>` : '') + (levels ? `Levels: ${levels}<br>` : '') + `Area: ${area} m²`
+        } else if (source === 'both') {
+          label = 'Confirmed by both datasets'
+          extra = `Confidence: ${confidence}%<br>Area: ${area} m²`
+        }
+
         infoWindowRef.current?.setContent(
           `<div style="font-size:11px;color:#001a40;font-family:sans-serif;">` +
-          `<strong>Google Building</strong><br>` +
-          `Confidence: ${confidence}%<br>` +
-          `Area: ${area} m²` +
+          `<strong>${label}</strong><br>` +
+          extra +
           `</div>`
         )
         infoWindowRef.current?.setPosition(e.latLng)
@@ -162,7 +191,15 @@ export function FootprintMapPreview({ height = '100%', ...props }: Props) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded-sm border-2 border-[#f97316] bg-[#f97316]/35 flex-shrink-0" />
-          <span className="text-navy">Satellite-Detected Structures</span>
+          <span className="text-navy">Google Buildings (2023)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded-sm border-2 border-[#06b6d4] bg-[#06b6d4]/35 flex-shrink-0" />
+          <span className="text-navy">OSM Buildings (live)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded-sm border-2 border-[#22c55e] bg-[#22c55e]/40 flex-shrink-0" />
+          <span className="text-navy">Confirmed by both</span>
         </div>
       </div>
     </div>
